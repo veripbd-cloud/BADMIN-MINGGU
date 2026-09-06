@@ -13,7 +13,7 @@ export default function TopBar({ profile }) {
   return (
     <div className="topbar">
       <div className="brand">
-        Kumpul <span className="accent">Badminton</span>
+        BADMIN <span className="accent">MINGGU</span>
       </div>
       <nav className="tabs">
         <Link href="/" className={router.pathname === '/' ? 'active' : ''}>
