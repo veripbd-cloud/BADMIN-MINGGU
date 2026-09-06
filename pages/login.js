@@ -26,7 +26,7 @@ export default function Login() {
   return (
     <div className="wrap" style={{ maxWidth: 380, paddingTop: 80 }}>
       <h1>Masuk</h1>
-      <p className="subtle">Kumpul Badminton — absensi & kas</p>
+      <p className="subtle">BADMIN MINGGU — absensi & kas</p>
       <form onSubmit={handleLogin}>
         <label>Email</label>
         <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
