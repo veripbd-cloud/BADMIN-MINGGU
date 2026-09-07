@@ -26,9 +26,10 @@ export default async function handler(req, res) {
 
   if (error) return res.status(500).json({ error: error.message });
 
-  // Aturan: no-show HARIAN -> kena outstanding Rp35rb (harga bisa berubah, ambil dari pengaturan)
-  // no-show MEMBER -> tidak ada penalti finansial (sudah bayar flat bulanan)
-  if (status_hadir === 'no_show' && pendaftaran.tipe_slot === 'harian') {
+  // Aturan: HARIAN (baik hadir maupun no-show) -> otomatis kena tagihan sesi (outstanding)
+  // sampai admin konfirmasi lunas. MEMBER -> tidak ada tagihan per-sesi (sudah bayar flat bulanan),
+  // termasuk no-show member tetap tidak ada penalti.
+  if (pendaftaran.tipe_slot === 'harian') {
     const { data: hargaSetting } = await supabaseAdmin
       .from('pengaturan')
       .select('value')
@@ -36,24 +37,33 @@ export default async function handler(req, res) {
       .single();
 
     const nominal = parseInt(hargaSetting?.value || '35000', 10);
+    const keterangan = status_hadir === 'hadir'
+      ? 'Iuran sesi (hadir main)'
+      : 'Daftar sesi tapi tidak hadir & tidak batal sebelum deadline';
 
-    // Hindari duplikat outstanding kalau endpoint ini dipanggil ulang
+    // Hindari duplikat outstanding kalau endpoint ini dipanggil ulang / status diubah bolak-balik
     const { data: sudahAda } = await supabaseAdmin
       .from('outstanding')
       .select('id')
-      .eq('sumber', 'no_show_harian')
+      .eq('sumber', 'tagihan_harian')
       .eq('referensi_id', pendaftaran_id)
       .maybeSingle();
 
     if (!sudahAda) {
       await supabaseAdmin.from('outstanding').insert({
         player_id: pendaftaran.player_id,
-        sumber: 'no_show_harian',
+        sumber: 'tagihan_harian',
         referensi_id: pendaftaran_id,
         nominal,
-        keterangan: 'Daftar sesi tapi tidak hadir & tidak batal sebelum deadline',
+        keterangan,
         status: 'belum_lunas',
       });
+    } else {
+      // Kalau admin ganti status (misal dari no_show ke hadir), update keterangannya juga
+      await supabaseAdmin
+        .from('outstanding')
+        .update({ keterangan })
+        .eq('id', sudahAda.id);
     }
   }
 
