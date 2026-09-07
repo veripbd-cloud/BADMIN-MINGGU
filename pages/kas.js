@@ -3,6 +3,15 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../lib/useAuth';
 import TopBar from '../components/TopBar';
 
+function formatRibuan(v) {
+  const angka = String(v || '').replace(/\D/g, '');
+  if (!angka) return '';
+  return parseInt(angka, 10).toLocaleString('id-ID');
+}
+function parseRibuan(str) {
+  return String(str || '').replace(/\D/g, '');
+}
+
 export default function Kas() {
   const { profile, loading } = useAuth();
   const [transaksi, setTransaksi] = useState([]);
@@ -10,6 +19,9 @@ export default function Kas() {
   const [profilesMap, setProfilesMap] = useState({});
   const [form, setForm] = useState({ jenis: 'pengeluaran', kategori: 'bola', nominal: '', keterangan: '' });
   const [msg, setMsg] = useState('');
+  const [processingId, setProcessingId] = useState(null); // kunci tombol yang lagi diproses
+  const [stokPiece, setStokPiece] = useState(0);
+  const [stokForm, setStokForm] = useState({ arah: 'tambah', slop: '', piece: '' });
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
@@ -20,19 +32,28 @@ export default function Kas() {
     const { data: o } = await supabase.from('outstanding').select('*').eq('status', 'belum_lunas');
     setOutstanding(o || []);
 
-    const ids = [...new Set((o || []).map((x) => x.player_id))];
+    // Gabungkan semua player_id yang perlu ditampilkan namanya: dari outstanding DAN dari transaksi
+    const idsOutstanding = (o || []).map((x) => x.player_id);
+    const idsTransaksi = (t || []).map((x) => x.player_id).filter(Boolean);
+    const ids = [...new Set([...idsOutstanding, ...idsTransaksi])];
     if (ids.length) {
       const { data: p } = await supabase.from('profiles').select('id, nama').in('id', ids);
       const map = {};
       (p || []).forEach((pr) => { map[pr.id] = pr.nama; });
       setProfilesMap(map);
     }
+
+    const resStok = await fetch('/api/admin/stok-shuttle');
+    const jsonStok = await resStok.json();
+    setStokPiece(jsonStok.jumlah_piece || 0);
   }
 
   useEffect(() => { if (!loading) load(); }, [loading]);
 
   const saldo = transaksi.reduce((sum, t) => sum + (t.jenis === 'pemasukan' ? t.nominal : -t.nominal), 0);
   const totalOutstanding = outstanding.reduce((sum, o) => sum + o.nominal, 0);
+  const stokSlop = Math.floor(stokPiece / 12);
+  const stokSisaPiece = stokPiece % 12;
 
   async function tambahTransaksi(e) {
     e.preventDefault();
@@ -50,13 +71,34 @@ export default function Kas() {
   }
 
   async function lunasi(outstanding_id) {
+    if (processingId) return; // sedang ada proses lain -> abaikan klik lain
+    setProcessingId(outstanding_id);
     const token = await getAccessToken();
-    await fetch('/api/admin/lunasi-outstanding', {
+    try {
+      await fetch('/api/admin/lunasi-outstanding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ outstanding_id }),
+      });
+      await load();
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
+  async function updateStok(e) {
+    e.preventDefault();
+    setMsg('');
+    const token = await getAccessToken();
+    const res = await fetch('/api/admin/stok-shuttle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ outstanding_id }),
+      body: JSON.stringify(stokForm),
     });
-    load();
+    const json = await res.json();
+    if (!res.ok) { setMsg(json.error); return; }
+    setStokPiece(json.jumlah_piece);
+    setStokForm({ arah: 'tambah', slop: '', piece: '' });
   }
 
   if (loading) return null;
@@ -68,12 +110,12 @@ export default function Kas() {
 
       <div className="stat">
         <div className="item">
-          <span className="num">Rp{saldo.toLocaleString('id-ID')}</span>
           <span className="label">Saldo kas saat ini</span>
+          <span className="num">Rp{saldo.toLocaleString('id-ID')}</span>
         </div>
         <div className="item">
-          <span className="num">Rp{totalOutstanding.toLocaleString('id-ID')}</span>
           <span className="label">Total outstanding</span>
+          <span className="num">Rp{totalOutstanding.toLocaleString('id-ID')}</span>
         </div>
       </div>
 
@@ -84,12 +126,51 @@ export default function Kas() {
           <div className="card-row">
             <div>
               <strong>{profilesMap[o.player_id] || '—'}</strong>
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>{o.keterangan} · Rp{o.nominal.toLocaleString('id-ID')}</div>
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>{o.keterangan} · Rp{o.nominal.toLocaleString('id-ID')}</div>
             </div>
-            {isAdmin && <button className="secondary" onClick={() => lunasi(o.id)}>Tandai Lunas</button>}
+            {isAdmin && (
+              <button
+                className="secondary"
+                disabled={processingId === o.id}
+                onClick={() => lunasi(o.id)}
+              >
+                {processingId === o.id ? 'Memproses...' : 'Tandai Lunas'}
+              </button>
+            )}
           </div>
         </div>
       ))}
+
+      <h2>Stock Shuttlecock</h2>
+      <div className="card">
+        <div className="card-row" style={{ marginBottom: isAdmin ? 14 : 0 }}>
+          <span>Sisa stok saat ini</span>
+          <strong>{stokSlop} slop {stokSisaPiece} piece <span className="subtle" style={{ fontWeight: 400, fontSize: 11 }}>({stokPiece} piece total)</span></strong>
+        </div>
+
+        {isAdmin && (
+          <form onSubmit={updateStok}>
+            <label>Arah</label>
+            <select value={stokForm.arah} onChange={(e) => setStokForm({ ...stokForm, arah: e.target.value })}>
+              <option value="tambah">Tambah stok (beli baru)</option>
+              <option value="kurangi">Kurangi stok (terpakai main)</option>
+            </select>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label>Slop (1 slop = 12 piece)</label>
+                <input type="number" min="0" value={stokForm.slop} onChange={(e) => setStokForm({ ...stokForm, slop: e.target.value })} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label>Piece (satuan)</label>
+                <input type="number" min="0" value={stokForm.piece} onChange={(e) => setStokForm({ ...stokForm, piece: e.target.value })} />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button type="submit">Update Stok</button>
+            </div>
+          </form>
+        )}
+      </div>
 
       {isAdmin && (
         <>
@@ -109,7 +190,10 @@ export default function Kas() {
               <option value="lain_lain">Lain-lain</option>
             </select>
             <label>Nominal (Rp)</label>
-            <input type="number" required value={form.nominal} onChange={(e) => setForm({ ...form, nominal: e.target.value })} />
+            <input
+              value={formatRibuan(form.nominal)}
+              onChange={(e) => setForm({ ...form, nominal: parseRibuan(e.target.value) })}
+            />
             <label>Keterangan</label>
             <input value={form.keterangan} onChange={(e) => setForm({ ...form, keterangan: e.target.value })} />
             {msg && <p className="error">{msg}</p>}
@@ -123,7 +207,7 @@ export default function Kas() {
       <h2>Riwayat Transaksi</h2>
       <table>
         <thead>
-          <tr><th>Tanggal</th><th>Jenis</th><th>Kategori</th><th>Nominal</th><th>Keterangan</th></tr>
+          <tr><th>Tanggal</th><th>Jenis</th><th>Kategori</th><th>Nominal</th><th>Pemain</th><th>Keterangan</th></tr>
         </thead>
         <tbody>
           {transaksi.map((t) => (
@@ -134,6 +218,7 @@ export default function Kas() {
               <td style={{ color: t.jenis === 'pemasukan' ? '#9ed6b0' : '#e8988c' }}>
                 {t.jenis === 'pemasukan' ? '+' : '-'}Rp{t.nominal.toLocaleString('id-ID')}
               </td>
+              <td>{t.player_id ? (profilesMap[t.player_id] || '-') : '-'}</td>
               <td>{t.keterangan || '-'}</td>
             </tr>
           ))}
