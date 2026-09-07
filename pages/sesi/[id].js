@@ -115,6 +115,9 @@ export default function DetailSesi() {
 
   if (loading || !sesi) return null;
 
+  const sesiBerakhir = new Date() > new Date(sesi.tanggal + 'T10:00:00');
+  const bisaAdminKontrol = isAdmin && !sesiBerakhir;
+
   return (
     <div className="wrap">
       <TopBar profile={profile} />
@@ -122,13 +125,14 @@ export default function DetailSesi() {
       <p className="subtle">
         Deadline batal: {new Date(sesi.deadline_batal).toLocaleString('id-ID')} · Kuota: {sesi.kuota_member} member / {sesi.kuota_harian} harian
       </p>
+      {sesiBerakhir && <p className="badge done" style={{ display: 'inline-block', marginBottom: 10 }}>Sesi sudah berakhir (lewat jam 10:00) — kontrol admin dikunci</p>}
       {msg && <p className="error">{msg}</p>}
 
       <h2>Terdaftar — Member ({terdaftarMember.length}/{sesi.kuota_member})</h2>
-      <ListPeserta items={terdaftarMember} profiles={profiles} isAdmin={isAdmin} onCheckin={checkin} onTandai={tandaiHadir} />
+      <ListPeserta items={terdaftarMember} profiles={profiles} isAdmin={bisaAdminKontrol} onCheckin={checkin} onTandai={tandaiHadir} />
 
       <h2>Terdaftar — Harian ({terdaftarHarian.length}/{sesi.kuota_harian})</h2>
-      <ListPeserta items={terdaftarHarian} profiles={profiles} isAdmin={isAdmin} onCheckin={checkin} onTandai={tandaiHadir} />
+      <ListPeserta items={terdaftarHarian} profiles={profiles} isAdmin={bisaAdminKontrol} onCheckin={checkin} onTandai={tandaiHadir} />
 
       {(waitingMember.length > 0 || waitingHarian.length > 0) && (
         <>
@@ -137,7 +141,7 @@ export default function DetailSesi() {
             <div className="card" key={p.id}>
               <div className="card-row">
                 <span>#{idx + 1} {profiles[p.player_id]?.nama} <span className="badge">member</span></span>
-                {isAdmin && <button className="secondary" onClick={() => promosikan(p.id)}>Naikkan</button>}
+                {bisaAdminKontrol && <button className="secondary" onClick={() => promosikan(p.id)}>Naikkan</button>}
               </div>
             </div>
           ))}
@@ -145,7 +149,7 @@ export default function DetailSesi() {
             <div className="card" key={p.id}>
               <div className="card-row">
                 <span>#{idx + 1} {profiles[p.player_id]?.nama} <span className="badge">harian</span></span>
-                {isAdmin && <button className="secondary" onClick={() => promosikan(p.id)}>Naikkan</button>}
+                {bisaAdminKontrol && <button className="secondary" onClick={() => promosikan(p.id)}>Naikkan</button>}
               </div>
             </div>
           ))}
@@ -176,7 +180,7 @@ export default function DetailSesi() {
                           </div>
                         ))}
                       </div>
-                      <button onClick={() => selesaiMain(kode)}>Selesai Main</button>
+                      <button disabled={!bisaAdminKontrol} onClick={() => selesaiMain(kode)}>Selesai Main</button>
                     </>
                   )}
 
@@ -202,7 +206,7 @@ export default function DetailSesi() {
                       </div>
                       <button
                         className="secondary"
-                        disabled={!(pilihanPerLapangan[kode] || []).length}
+                        disabled={!bisaAdminKontrol || !(pilihanPerLapangan[kode] || []).length}
                         onClick={() => mulaiMain(kode)}
                       >
                         Mulai Main
@@ -232,7 +236,7 @@ export default function DetailSesi() {
                 <div className="card" key={p.id}>
                   <div className="card-row">
                     <span>{profiles[p.player_id]?.nama}</span>
-                    <button className="secondary" onClick={() => checkin(p.id)}>Check-in</button>
+                    <button className="secondary" disabled={!bisaAdminKontrol} onClick={() => checkin(p.id)}>Check-in</button>
                   </div>
                 </div>
               ))}
