@@ -10,7 +10,7 @@ export default async function handler(req, res) {
 
   const { error } = await supabaseAdmin
     .from('pendaftaran_sesi')
-    .update({ waktu_checkin: new Date().toISOString() })
+    .update({ waktu_checkin: new Date().toISOString(), status_main: 'menunggu' })
     .eq('id', pendaftaran_id);
 
   if (error) return res.status(500).json({ error: error.message });
