@@ -4,6 +4,16 @@ import { supabase } from '../../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
 
+function formatRibuan(v) {
+  const angka = String(v || '').replace(/\D/g, '');
+  if (!angka) return '';
+  return parseInt(angka, 10).toLocaleString('id-ID');
+}
+
+function parseRibuan(str) {
+  return String(str || '').replace(/\D/g, '');
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const { profile, loading } = useAuth();
@@ -56,10 +66,11 @@ export default function AdminPage() {
     e.preventDefault();
     setMsg('');
     // Deadline batal = Sabtu 23:59 sebelum tanggal sesi (sesuai pengaturan default)
-    const tanggalSesi = new Date(sesiForm.tanggal);
+    // Deadline batal = persis jam 00:00 di tanggal sesi itu sendiri.
+    // Setelah lewat tengah malam menuju hari sesi, batal otomatis tidak bisa lagi
+    // (hanya admin yang bisa ubah manual lewat Supabase kalau perlu).
+    const tanggalSesi = new Date(sesiForm.tanggal + 'T00:00:00');
     const deadline = new Date(tanggalSesi);
-    deadline.setDate(deadline.getDate() - 1); // asumsi sesi hari Minggu -> deadline Sabtu
-    deadline.setHours(23, 59, 0, 0);
 
     const token = await getAccessToken();
     const res = await fetch('/api/admin/buat-sesi', {
@@ -103,9 +114,15 @@ export default function AdminPage() {
       <h2>Pengaturan Harga & Kuota</h2>
       <form className="card" onSubmit={simpanPengaturan}>
         <label>Harga harian (Rp)</label>
-        <input value={pengaturan.harga_harian || ''} onChange={(e) => setPengaturan({ ...pengaturan, harga_harian: e.target.value })} />
+        <input
+          value={formatRibuan(pengaturan.harga_harian)}
+          onChange={(e) => setPengaturan({ ...pengaturan, harga_harian: parseRibuan(e.target.value) })}
+        />
         <label>Harga member bulanan (Rp)</label>
-        <input value={pengaturan.harga_member_bulanan || ''} onChange={(e) => setPengaturan({ ...pengaturan, harga_member_bulanan: e.target.value })} />
+        <input
+          value={formatRibuan(pengaturan.harga_member_bulanan)}
+          onChange={(e) => setPengaturan({ ...pengaturan, harga_member_bulanan: parseRibuan(e.target.value) })}
+        />
         <label>Kuota member per sesi</label>
         <input value={pengaturan.kuota_member || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_member: e.target.value })} />
         <label>Kuota harian per sesi</label>
@@ -113,7 +130,10 @@ export default function AdminPage() {
         <label>Kuota total per sesi</label>
         <input value={pengaturan.kuota_total || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_total: e.target.value })} />
         <label>Biaya lapangan per bulan (Rp)</label>
-        <input value={pengaturan.biaya_lapangan_bulanan || ''} onChange={(e) => setPengaturan({ ...pengaturan, biaya_lapangan_bulanan: e.target.value })} />
+        <input
+          value={formatRibuan(pengaturan.biaya_lapangan_bulanan)}
+          onChange={(e) => setPengaturan({ ...pengaturan, biaya_lapangan_bulanan: parseRibuan(e.target.value) })}
+        />
         <div className="form-actions"><button type="submit">Simpan Pengaturan</button></div>
       </form>
 
@@ -123,7 +143,10 @@ export default function AdminPage() {
         <input type="date" required value={sesiForm.tanggal} onChange={(e) => setSesiForm({ ...sesiForm, tanggal: e.target.value })} />
         <label>Label (opsional)</label>
         <input placeholder="misal: Week 5 - 12 September 2026" value={sesiForm.label} onChange={(e) => setSesiForm({ ...sesiForm, label: e.target.value })} />
-        <p className="subtle" style={{ fontSize: 12 }}>Deadline batal otomatis dihitung: sehari sebelum tanggal sesi, jam 23:59.</p>
+        <p className="subtle" style={{ fontSize: 11 }}>
+          Sesi main jam 07:00–10:00 di tanggal ini. Deadline batal otomatis: tepat jam 00:00 di tanggal sesi
+          (setelah itu batal harus lewat admin). Sesi otomatis dianggap selesai begitu lewat jam 10:00.
+        </p>
         <div className="form-actions"><button type="submit">Buat Sesi</button></div>
       </form>
 
@@ -133,10 +156,12 @@ export default function AdminPage() {
         <div className="card" key={p.id}>
           <div className="card-row">
             <span>{p.nama} <span className="badge">{p.tipe}</span></span>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button className="secondary" onClick={() => approveLevel(p.id, 'pemula')}>Pemula</button>
-              <button className="secondary" onClick={() => approveLevel(p.id, 'menengah')}>Menengah</button>
-              <button className="secondary" onClick={() => approveLevel(p.id, 'mahir')}>Mahir</button>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button className="secondary" onClick={() => approveLevel(p.id, 'A1')}>A1</button>
+              <button className="secondary" onClick={() => approveLevel(p.id, 'A2')}>A2</button>
+              <button className="secondary" onClick={() => approveLevel(p.id, 'B1')}>B1</button>
+              <button className="secondary" onClick={() => approveLevel(p.id, 'B2')}>B2</button>
+              <button className="secondary" onClick={() => approveLevel(p.id, 'C')}>C</button>
             </div>
           </div>
         </div>
@@ -154,7 +179,10 @@ export default function AdminPage() {
         <label>Tahun</label>
         <input type="number" value={subsidiForm.tahun} onChange={(e) => setSubsidiForm({ ...subsidiForm, tahun: e.target.value })} />
         <label>Biaya bola bulan ini (Rp)</label>
-        <input type="number" value={subsidiForm.biaya_bola} onChange={(e) => setSubsidiForm({ ...subsidiForm, biaya_bola: e.target.value })} />
+        <input
+          value={formatRibuan(subsidiForm.biaya_bola)}
+          onChange={(e) => setSubsidiForm({ ...subsidiForm, biaya_bola: parseRibuan(e.target.value) })}
+        />
         <div className="form-actions"><button type="submit">Proses</button></div>
       </form>
 
