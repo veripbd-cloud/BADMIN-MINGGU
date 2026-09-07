@@ -49,7 +49,7 @@ export default function DetailSesi() {
   const semuaTerdaftar = [...terdaftarMember, ...terdaftarHarian];
 
   const antrianMenunggu = semuaTerdaftar
-    .filter((p) => p.waktu_checkin && p.status_main === 'menunggu')
+    .filter((p) => p.waktu_checkin && p.status_main !== 'main')
     .sort((a, b) => {
       if (a.jumlah_game !== b.jumlah_game) return a.jumlah_game - b.jumlah_game;
       return new Date(a.waktu_checkin) - new Date(b.waktu_checkin);
@@ -85,6 +85,12 @@ export default function DetailSesi() {
 
   async function promosikan(pendaftaran_id) {
     await apiCall('/api/admin/promosikan-manual', { pendaftaran_id });
+    load();
+  }
+
+  async function batalkanAdmin(pendaftaran_id) {
+    if (!confirm('Batalkan pendaftaran ini? Slot akan otomatis coba dikasih ke waiting list tipe yang sama dulu.')) return;
+    await apiCall('/api/admin/batalkan-pendaftaran', { pendaftaran_id });
     load();
   }
 
@@ -129,10 +135,10 @@ export default function DetailSesi() {
       {msg && <p className="error">{msg}</p>}
 
       <h2>Terdaftar — Member ({terdaftarMember.length}/{sesi.kuota_member})</h2>
-      <ListPeserta items={terdaftarMember} profiles={profiles} isAdmin={bisaAdminKontrol} onCheckin={checkin} onTandai={tandaiHadir} />
+      <ListPeserta items={terdaftarMember} profiles={profiles} isAdmin={bisaAdminKontrol} onCheckin={checkin} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} />
 
       <h2>Terdaftar — Harian ({terdaftarHarian.length}/{sesi.kuota_harian})</h2>
-      <ListPeserta items={terdaftarHarian} profiles={profiles} isAdmin={bisaAdminKontrol} onCheckin={checkin} onTandai={tandaiHadir} />
+      <ListPeserta items={terdaftarHarian} profiles={profiles} isAdmin={bisaAdminKontrol} onCheckin={checkin} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} />
 
       {(waitingMember.length > 0 || waitingHarian.length > 0) && (
         <>
@@ -248,7 +254,7 @@ export default function DetailSesi() {
   );
 }
 
-function ListPeserta({ items, profiles, isAdmin, onCheckin, onTandai }) {
+function ListPeserta({ items, profiles, isAdmin, onCheckin, onTandai, onBatalkan }) {
   if (items.length === 0) return <div className="empty">Belum ada.</div>;
   return items.map((p) => {
     const prof = profiles[p.player_id];
@@ -265,7 +271,7 @@ function ListPeserta({ items, profiles, isAdmin, onCheckin, onTandai }) {
             </div>
           </div>
           {isAdmin && (
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               {!p.waktu_checkin && <button className="secondary" onClick={() => onCheckin(p.id)}>Check-in</button>}
               {!p.status_hadir && (
                 <>
@@ -273,6 +279,7 @@ function ListPeserta({ items, profiles, isAdmin, onCheckin, onTandai }) {
                   <button className="danger" onClick={() => onTandai(p.id, 'no_show')}>No-show</button>
                 </>
               )}
+              <button className="danger" onClick={() => onBatalkan(p.id)}>Batalkan (Admin)</button>
             </div>
           )}
         </div>
