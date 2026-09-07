@@ -4,6 +4,8 @@ import { supabase } from '../../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
 
+const DAFTAR_LAPANGAN = ['A6', 'A7', 'A9', 'A10'];
+
 export default function DetailSesi() {
   const router = useRouter();
   const { id } = router.query;
@@ -11,8 +13,7 @@ export default function DetailSesi() {
   const [sesi, setSesi] = useState(null);
   const [pendaftaran, setPendaftaran] = useState([]);
   const [profiles, setProfiles] = useState({});
-  const [lapangan, setLapangan] = useState(1);
-  const [pilihanPemain, setPilihanPemain] = useState([]);
+  const [pilihanPerLapangan, setPilihanPerLapangan] = useState({});
   const [msg, setMsg] = useState('');
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
@@ -45,14 +46,20 @@ export default function DetailSesi() {
   const terdaftarHarian = pendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'harian');
   const waitingMember = pendaftaran.filter((p) => p.status_daftar === 'waiting_list' && p.tipe_slot === 'member');
   const waitingHarian = pendaftaran.filter((p) => p.status_daftar === 'waiting_list' && p.tipe_slot === 'harian');
+  const semuaTerdaftar = [...terdaftarMember, ...terdaftarHarian];
 
-  // Rekomendasi next-up: sudah check-in, urutkan jumlah_game paling sedikit lalu waktu_checkin paling lama
-  const sudahCheckin = [...terdaftarMember, ...terdaftarHarian]
-    .filter((p) => p.waktu_checkin)
+  const antrianMenunggu = semuaTerdaftar
+    .filter((p) => p.waktu_checkin && p.status_main === 'menunggu')
     .sort((a, b) => {
       if (a.jumlah_game !== b.jumlah_game) return a.jumlah_game - b.jumlah_game;
       return new Date(a.waktu_checkin) - new Date(b.waktu_checkin);
     });
+
+  const belumCheckin = semuaTerdaftar.filter((p) => !p.waktu_checkin);
+
+  function pemainDiLapangan(kodeLapangan) {
+    return semuaTerdaftar.filter((p) => p.status_main === 'main' && p.lapangan_sekarang === kodeLapangan);
+  }
 
   async function apiCall(url, body) {
     const token = await getAccessToken();
@@ -81,16 +88,28 @@ export default function DetailSesi() {
     load();
   }
 
-  function togglePemain(player_id) {
-    setPilihanPemain((prev) =>
-      prev.includes(player_id) ? prev.filter((x) => x !== player_id) : [...prev, player_id]
-    );
+  function togglePilihan(kodeLapangan, player_id) {
+    setPilihanPerLapangan((prev) => {
+      const current = prev[kodeLapangan] || [];
+      const next = current.includes(player_id)
+        ? current.filter((x) => x !== player_id)
+        : [...current, player_id];
+      return { ...prev, [kodeLapangan]: next };
+    });
   }
 
-  async function submitGame() {
-    if (pilihanPemain.length === 0) { setMsg('Pilih minimal 1 pemain'); return; }
-    await apiCall('/api/admin/input-game', { sesi_id: id, lapangan, player_ids: pilihanPemain });
-    setPilihanPemain([]);
+  async function mulaiMain(kodeLapangan) {
+    const pilihan = pilihanPerLapangan[kodeLapangan] || [];
+    if (pilihan.length === 0) { setMsg('Pilih minimal 1 pemain dari antrian dulu'); return; }
+    setMsg('');
+    await apiCall('/api/admin/mulai-main', { sesi_id: id, lapangan: kodeLapangan, player_ids: pilihan });
+    setPilihanPerLapangan((prev) => ({ ...prev, [kodeLapangan]: [] }));
+    load();
+  }
+
+  async function selesaiMain(kodeLapangan) {
+    setMsg('');
+    await apiCall('/api/admin/selesai-main', { sesi_id: id, lapangan: kodeLapangan });
     load();
   }
 
@@ -113,7 +132,7 @@ export default function DetailSesi() {
 
       {(waitingMember.length > 0 || waitingHarian.length > 0) && (
         <>
-          <h2>Waiting List</h2>
+          <h2>Waiting List (Sesi)</h2>
           {waitingMember.map((p, idx) => (
             <div className="card" key={p.id}>
               <div className="card-row">
@@ -135,10 +154,69 @@ export default function DetailSesi() {
 
       {isAdmin && (
         <>
-          <h2>Rekomendasi Next-Up</h2>
-          <p className="subtle">Urutan saran berdasarkan jumlah game paling sedikit & lama menunggu sejak check-in. Keputusan final tetap di admin.</p>
-          {sudahCheckin.length === 0 && <div className="empty">Belum ada yang check-in.</div>}
-          {sudahCheckin.slice(0, 8).map((p, idx) => (
+          <h2>Lapangan</h2>
+          <p className="subtle">Klik pemain dari antrian di bawah kartu lapangan buat mulai main, atau klik Selesai kalau game-nya udah kelar.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12, marginBottom: 12 }}>
+            {DAFTAR_LAPANGAN.map((kode) => {
+              const pemain = pemainDiLapangan(kode);
+              const kosong = pemain.length === 0;
+              return (
+                <div className="card" key={kode}>
+                  <div className="card-row" style={{ marginBottom: 8 }}>
+                    <strong>Lapangan {kode}</strong>
+                    <span className={`badge ${kosong ? '' : 'open'}`}>{kosong ? 'Kosong' : 'Sedang main'}</span>
+                  </div>
+
+                  {!kosong && (
+                    <>
+                      <div style={{ marginBottom: 10 }}>
+                        {pemain.map((p) => (
+                          <div key={p.id} style={{ fontSize: 14, marginBottom: 4 }}>
+                            {profiles[p.player_id]?.nama} <span className="subtle" style={{ fontSize: 12 }}>({p.jumlah_game}x sebelumnya)</span>
+                          </div>
+                        ))}
+                      </div>
+                      <button onClick={() => selesaiMain(kode)}>Selesai Main</button>
+                    </>
+                  )}
+
+                  {kosong && (
+                    <>
+                      <p className="subtle" style={{ fontSize: 12, margin: '0 0 6px' }}>Pilih dari antrian:</p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                        {antrianMenunggu.length === 0 && <span className="subtle" style={{ fontSize: 13 }}>Antrian kosong.</span>}
+                        {antrianMenunggu.map((p) => {
+                          const terpilih = (pilihanPerLapangan[kode] || []).includes(p.player_id);
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              className={terpilih ? '' : 'secondary'}
+                              style={{ fontSize: 13, padding: '6px 10px' }}
+                              onClick={() => togglePilihan(kode, p.player_id)}
+                            >
+                              {profiles[p.player_id]?.nama}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <button
+                        className="secondary"
+                        disabled={!(pilihanPerLapangan[kode] || []).length}
+                        onClick={() => mulaiMain(kode)}
+                      >
+                        Mulai Main
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <h2>Antrian Menunggu ({antrianMenunggu.length})</h2>
+          {antrianMenunggu.length === 0 && <div className="empty">Tidak ada yang sedang menunggu.</div>}
+          {antrianMenunggu.map((p, idx) => (
             <div className="card" key={p.id}>
               <div className="card-row">
                 <span>{idx + 1}. {profiles[p.player_id]?.nama} — {p.jumlah_game}x main</span>
@@ -147,32 +225,19 @@ export default function DetailSesi() {
             </div>
           ))}
 
-          <h2>Input Game Selesai</h2>
-          <div className="card">
-            <label>Lapangan</label>
-            <select value={lapangan} onChange={(e) => setLapangan(parseInt(e.target.value, 10))}>
-              <option value={1}>Lapangan 1</option>
-              <option value={2}>Lapangan 2</option>
-              <option value={3}>Lapangan 3</option>
-              <option value={4}>Lapangan 4</option>
-            </select>
-            <label>Pilih pemain yang baru main</label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-              {[...terdaftarMember, ...terdaftarHarian].map((p) => (
-                <button
-                  key={p.id}
-                  className={pilihanPemain.includes(p.player_id) ? '' : 'secondary'}
-                  onClick={() => togglePemain(p.player_id)}
-                  type="button"
-                >
-                  {profiles[p.player_id]?.nama}
-                </button>
+          {belumCheckin.length > 0 && (
+            <>
+              <h2>Belum Check-in</h2>
+              {belumCheckin.map((p) => (
+                <div className="card" key={p.id}>
+                  <div className="card-row">
+                    <span>{profiles[p.player_id]?.nama}</span>
+                    <button className="secondary" onClick={() => checkin(p.id)}>Check-in</button>
+                  </div>
+                </div>
               ))}
-            </div>
-            <div className="form-actions">
-              <button onClick={submitGame}>Simpan Game</button>
-            </div>
-          </div>
+            </>
+          )}
         </>
       )}
     </div>
@@ -191,6 +256,7 @@ function ListPeserta({ items, profiles, isAdmin, onCheckin, onTandai }) {
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
               {p.waktu_checkin ? `Check-in ${new Date(p.waktu_checkin).toLocaleTimeString('id-ID')}` : 'Belum check-in'}
               {' · '}{p.jumlah_game}x main
+              {p.status_main === 'main' && p.lapangan_sekarang && ` · Sedang di ${p.lapangan_sekarang}`}
               {p.status_hadir && ` · ${p.status_hadir === 'hadir' ? 'Hadir' : 'No-show'}`}
             </div>
           </div>
