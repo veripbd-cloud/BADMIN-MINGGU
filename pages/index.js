@@ -69,11 +69,16 @@ export default function Home() {
 
   if (loading) return null;
 
+  function sudahBerakhir(sesi) {
+    const batasAkhir = new Date(sesi.tanggal + 'T10:00:00');
+    return new Date() > batasAkhir;
+  }
+
   return (
     <div className="wrap">
       <TopBar profile={profile} />
       <h1>Sesi Mingguan</h1>
-      <p className="subtle">Daftar untuk ikut main, atau batal sebelum deadline.</p>
+      <p className="subtle">Main tiap minggu, jam 07:00–10:00. Daftar untuk ikut main, atau batal sebelum deadline.</p>
 
       {msg && <p className="error">{msg}</p>}
 
@@ -82,18 +87,21 @@ export default function Home() {
       {sesiList.map((sesi) => {
         const p = pendaftaranSaya[sesi.id];
         const lewatDeadline = new Date() > new Date(sesi.deadline_batal);
+        const berakhir = sudahBerakhir(sesi);
 
         return (
           <div className="card" key={sesi.id}>
             <div className="card-row">
               <div>
                 <Link href={`/sesi/${sesi.id}`}><strong>{sesi.label || sesi.tanggal}</strong></Link>
-                <p className="subtle" style={{ margin: '4px 0 0', fontSize: 13 }}>
+                <p className="subtle" style={{ margin: '4px 0 0', fontSize: 11 }}>
                   Deadline batal: {new Date(sesi.deadline_batal).toLocaleString('id-ID')}
                 </p>
               </div>
               <div style={{ textAlign: 'right' }}>
-                {p ? (
+                {berakhir ? (
+                  <span className="badge done">Selesai</span>
+                ) : p ? (
                   <>
                     <span className={`badge ${p.status_daftar === 'terdaftar' ? 'open' : 'warn'}`}>
                       {p.status_daftar === 'terdaftar' ? 'Terdaftar' : 'Waiting list'}
