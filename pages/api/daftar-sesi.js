@@ -12,23 +12,21 @@ export default async function handler(req, res) {
   const { data: sesi } = await supabaseAdmin.from('sesi').select('*').eq('id', sesi_id).single();
   if (!sesi) return res.status(404).json({ error: 'Sesi tidak ditemukan' });
 
-  // Sudah pernah daftar & masih aktif?
-  const { data: existing } = await supabaseAdmin
+  // Cek baris pendaftaran yang sudah pernah ada untuk kombinasi sesi+player ini (apapun statusnya)
+  const { data: barisLama } = await supabaseAdmin
     .from('pendaftaran_sesi')
     .select('*')
     .eq('sesi_id', sesi_id)
     .eq('player_id', profile.id)
-    .neq('status_daftar', 'batal')
     .maybeSingle();
 
-  if (existing) {
+  if (barisLama && barisLama.status_daftar !== 'batal') {
     return res.status(400).json({ error: 'Kamu sudah terdaftar di sesi ini.' });
   }
 
-  const tipe_slot = profile.tipe; // 'member' atau 'harian'
+  const tipe_slot = profile.tipe;
   const kuota = tipe_slot === 'member' ? sesi.kuota_member : sesi.kuota_harian;
 
-  // Hitung berapa yang sudah "terdaftar" (bukan waiting_list) untuk tipe ini
   const { count: terdaftarCount } = await supabaseAdmin
     .from('pendaftaran_sesi')
     .select('*', { count: 'exact', head: true })
@@ -38,17 +36,36 @@ export default async function handler(req, res) {
 
   const status_daftar = (terdaftarCount ?? 0) < kuota ? 'terdaftar' : 'waiting_list';
 
-  const { data: baru, error } = await supabaseAdmin
-    .from('pendaftaran_sesi')
-    .insert({
-      sesi_id,
-      player_id: profile.id,
-      tipe_slot,
-      status_daftar,
-      waktu_daftar: new Date().toISOString(),
-    })
-    .select()
-    .single();
+  let baru, error;
+
+  if (barisLama) {
+    ({ data: baru, error } = await supabaseAdmin
+      .from('pendaftaran_sesi')
+      .update({
+        tipe_slot,
+        status_daftar,
+        waktu_daftar: new Date().toISOString(),
+        status_hadir: null,
+        waktu_checkin: null,
+        status_main: null,
+        lapangan_sekarang: null,
+      })
+      .eq('id', barisLama.id)
+      .select()
+      .single());
+  } else {
+    ({ data: baru, error } = await supabaseAdmin
+      .from('pendaftaran_sesi')
+      .insert({
+        sesi_id,
+        player_id: profile.id,
+        tipe_slot,
+        status_daftar,
+        waktu_daftar: new Date().toISOString(),
+      })
+      .select()
+      .single());
+  }
 
   if (error) return res.status(500).json({ error: error.message });
 
