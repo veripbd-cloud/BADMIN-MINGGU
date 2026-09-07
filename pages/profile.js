@@ -47,16 +47,16 @@ export default function Profile() {
 
       <div className="stat">
         <div className="item">
-          <span className="num">{profile.tipe === 'member' ? 'Member' : 'Harian'}</span>
           <span className="label">Status</span>
+          <span className="num">{profile.tipe === 'member' ? 'Member' : 'Harian'}</span>
         </div>
         <div className="item">
-          <span className="num">{profile.level_final || 'Belum di-review'}</span>
           <span className="label">Level</span>
+          <span className="num">{profile.level_final || 'Belum di-review'}</span>
         </div>
         <div className="item">
-          <span className="num">{profile.status_approval === 'approved' ? 'Terverifikasi' : 'Menunggu review'}</span>
           <span className="label">Status akun</span>
+          <span className="num">{profile.status_approval === 'approved' ? 'Terverifikasi' : 'Menunggu review'}</span>
         </div>
       </div>
 
