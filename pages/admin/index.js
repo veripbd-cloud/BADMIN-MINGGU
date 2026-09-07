@@ -61,16 +61,21 @@ export default function AdminPage() {
     deadline.setDate(deadline.getDate() - 1); // asumsi sesi hari Minggu -> deadline Sabtu
     deadline.setHours(23, 59, 0, 0);
 
-    const { error } = await supabase.from('sesi').insert({
-      tanggal: sesiForm.tanggal,
-      label: sesiForm.label || null,
-      kuota_total: parseInt(pengaturan.kuota_total || '30', 10),
-      kuota_member: parseInt(pengaturan.kuota_member || '20', 10),
-      kuota_harian: parseInt(pengaturan.kuota_harian || '10', 10),
-      deadline_batal: deadline.toISOString(),
-      status: 'buka',
+    const token = await getAccessToken();
+    const res = await fetch('/api/admin/buat-sesi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        tanggal: sesiForm.tanggal,
+        label: sesiForm.label,
+        kuota_total: pengaturan.kuota_total,
+        kuota_member: pengaturan.kuota_member,
+        kuota_harian: pengaturan.kuota_harian,
+        deadline_batal: deadline.toISOString(),
+      }),
     });
-    if (error) { setMsg(error.message); return; }
+    const json = await res.json();
+    if (!res.ok) { setMsg(json.error); return; }
     setMsg('Sesi baru dibuat.');
     setSesiForm({ tanggal: '', label: '' });
   }
