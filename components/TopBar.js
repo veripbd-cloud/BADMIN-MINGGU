@@ -13,15 +13,17 @@ export default function TopBar({ profile }) {
   return (
     <div className="topbar">
       <div className="brand">
-        BADMIN <span className="accent">MINGGU</span>
+        Kumpul <span className="accent">Badminton</span>
       </div>
       <nav className="tabs">
         <Link href="/" className={router.pathname === '/' ? 'active' : ''}>
           Sesi
         </Link>
-        <Link href="/kas" className={router.pathname === '/kas' ? 'active' : ''}>
-          Kas
-        </Link>
+        {profile && (profile.tipe === 'member' || profile.role === 'admin' || profile.role === 'super_admin') && (
+          <Link href="/kas" className={router.pathname === '/kas' ? 'active' : ''}>
+            Kas
+          </Link>
+        )}
         <Link href="/profile" className={router.pathname === '/profile' ? 'active' : ''}>
           Profil
         </Link>
