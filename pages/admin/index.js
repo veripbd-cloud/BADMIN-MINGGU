@@ -53,12 +53,19 @@ export default function AdminPage() {
   }
 
   async function approveLevel(player_id, level_final) {
+    setMsg('');
     const token = await getAccessToken();
-    await fetch('/api/admin/approve-level', {
+    const res = await fetch('/api/admin/approve-level', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ player_id, level_final }),
     });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      setMsg(`Gagal approve: ${json.error || 'terjadi kesalahan, coba lagi.'}`);
+      return;
+    }
+    setMsg(`Berhasil di-approve sebagai level ${level_final}.`);
     load();
   }
 
