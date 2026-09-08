@@ -74,6 +74,27 @@ export default function Home() {
     return new Date() > batasAkhir;
   }
 
+  // Akun yang belum di-approve admin (bukan admin/super_admin) tidak bisa lihat/daftar sesi
+  const isAdminRole = profile && (profile.role === 'admin' || profile.role === 'super_admin');
+  if (profile && profile.status_approval !== 'approved' && !isAdminRole) {
+    return (
+      <div className="wrap">
+        <TopBar profile={profile} />
+        <h1>Menunggu Persetujuan</h1>
+        <div className="card">
+          <p style={{ margin: 0 }}>
+            Akun kamu (<strong>{profile.nama}</strong>) sudah terdaftar sebagai <strong>{profile.tipe === 'member' ? 'Member' : 'Harian'}</strong>,
+            level usulan <strong>{profile.level_self || '-'}</strong>.
+          </p>
+          <p className="subtle" style={{ marginTop: 8, marginBottom: 0 }}>
+            Menunggu admin verifikasi & tentukan level final sebelum bisa ikut daftar sesi main.
+            Cek lagi halaman ini nanti.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="wrap">
       <TopBar profile={profile} />

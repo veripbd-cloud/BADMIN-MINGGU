@@ -20,13 +20,13 @@ export default function Kas() {
   const [form, setForm] = useState({ jenis: 'pengeluaran', kategori: 'bola', nominal: '', keterangan: '' });
   const [msg, setMsg] = useState('');
   const [processingId, setProcessingId] = useState(null); // kunci tombol yang lagi diproses
-  const [stokPiece, setStokPiece] = useState(0);
+  const [stokLog, setStokLog] = useState([]);
   const [stokForm, setStokForm] = useState({ arah: 'tambah', slop: '', piece: '' });
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
   async function load() {
-    const { data: t } = await supabase.from('transaksi_kas').select('*').order('tanggal', { ascending: false }).limit(50);
+    const { data: t } = await supabase.from('transaksi_kas').select('*').order('tanggal', { ascending: false }).order('created_at', { ascending: false }).limit(50);
     setTransaksi(t || []);
 
     const { data: o } = await supabase.from('outstanding').select('*').eq('status', 'belum_lunas');
@@ -43,15 +43,19 @@ export default function Kas() {
       setProfilesMap(map);
     }
 
-    const resStok = await fetch('/api/admin/stok-shuttle');
-    const jsonStok = await resStok.json();
-    setStokPiece(jsonStok.jumlah_piece || 0);
+    const { data: stokData } = await supabase
+      .from('stok_shuttle_log')
+      .select('*')
+      .order('waktu', { ascending: false })
+      .limit(50);
+    setStokLog(stokData || []);
   }
 
   useEffect(() => { if (!loading) load(); }, [loading]);
 
   const saldo = transaksi.reduce((sum, t) => sum + (t.jenis === 'pemasukan' ? t.nominal : -t.nominal), 0);
   const totalOutstanding = outstanding.reduce((sum, o) => sum + o.nominal, 0);
+  const stokPiece = stokLog.length > 0 ? stokLog[0].saldo_setelah : 0;
   const stokSlop = Math.floor(stokPiece / 12);
   const stokSisaPiece = stokPiece % 12;
 
@@ -103,11 +107,22 @@ export default function Kas() {
     });
     const json = await res.json();
     if (!res.ok) { setMsg(json.error); return; }
-    setStokPiece(json.jumlah_piece);
     setStokForm({ arah: 'tambah', slop: '', piece: '' });
+    load();
   }
 
   if (loading) return null;
+
+  const bolehLihatKas = profile && (profile.tipe === 'member' || isAdmin);
+  if (!bolehLihatKas) {
+    return (
+      <div className="wrap">
+        <TopBar profile={profile} />
+        <h1>Kas</h1>
+        <div className="empty">Halaman ini cuma buat member.</div>
+      </div>
+    );
+  }
 
   return (
     <div className="wrap">
@@ -178,6 +193,24 @@ export default function Kas() {
           </form>
         )}
       </div>
+
+      {stokLog.length > 0 && (
+        <table style={{ marginBottom: 20 }}>
+          <thead>
+            <tr><th>Waktu</th><th>Arah</th><th>Jumlah</th><th>Saldo Setelah</th></tr>
+          </thead>
+          <tbody>
+            {stokLog.map((s) => (
+              <tr key={s.id}>
+                <td>{new Date(s.waktu).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</td>
+                <td style={{ color: s.arah === 'tambah' ? '#9ed6b0' : '#e8988c' }}>{s.arah}</td>
+                <td>{s.arah === 'tambah' ? '+' : '-'}{Math.abs(s.delta_piece)} piece ({s.slop} slop {s.piece} piece)</td>
+                <td>{Math.floor(s.saldo_setelah / 12)} slop {s.saldo_setelah % 12} piece</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       {isAdmin && (
         <>
