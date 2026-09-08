@@ -102,7 +102,15 @@ export default function Profile() {
       ) : (
         <div className="card-row" style={{ marginBottom: 4 }}>
           <h1 style={{ margin: 0 }}>{namaTampil}</h1>
-          <button className="secondary" onClick={() => { setNamaBaru(namaTampil); setModeEdit(true); }}>Ganti Nama</button>
+          <button
+            className="secondary"
+            onClick={() => { setNamaBaru(namaTampil); setModeEdit(true); }}
+            aria-label="Ganti nama"
+            title="Ganti nama"
+            style={{ padding: '6px 10px', fontSize: 14, lineHeight: 1 }}
+          >
+            ✏️
+          </button>
         </div>
       )}
       {simpanMsg && <p className="error">{simpanMsg}</p>}
