@@ -73,13 +73,19 @@ export default function Kas() {
   async function lunasi(outstanding_id) {
     if (processingId) return; // sedang ada proses lain -> abaikan klik lain
     setProcessingId(outstanding_id);
+    setMsg('');
     const token = await getAccessToken();
     try {
-      await fetch('/api/admin/lunasi-outstanding', {
+      const res = await fetch('/api/admin/lunasi-outstanding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ outstanding_id }),
       });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setMsg(`Gagal tandai lunas: ${json.error || 'terjadi kesalahan, coba lagi.'}`);
+        return;
+      }
       await load();
     } finally {
       setProcessingId(null);
@@ -107,6 +113,7 @@ export default function Kas() {
     <div className="wrap">
       <TopBar profile={profile} />
       <h1>Kas</h1>
+      {msg && <p className="error">{msg}</p>}
 
       <div className="stat">
         <div className="item">
