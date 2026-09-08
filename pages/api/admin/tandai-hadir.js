@@ -29,7 +29,7 @@ export default async function handler(req, res) {
   // Aturan: HARIAN (baik hadir maupun no-show) -> otomatis kena tagihan sesi (outstanding)
   // sampai admin konfirmasi lunas. MEMBER -> tidak ada tagihan per-sesi (sudah bayar flat bulanan),
   // termasuk no-show member tetap tidak ada penalti.
-  if (pendaftaran.tipe_slot === 'harian') {
+  if (pendaftaran.tipe_slot === 'harian' || pendaftaran.tipe_slot === 'guest') {
     const { data: hargaSetting } = await supabaseAdmin
       .from('pengaturan')
       .select('value')

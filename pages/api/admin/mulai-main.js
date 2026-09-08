@@ -6,12 +6,12 @@ export default async function handler(req, res) {
   const profile = await getProfileFromRequest(req);
   if (!isAdmin(profile)) return res.status(403).json({ error: 'Khusus admin' });
 
-  const { sesi_id, lapangan, player_ids } = req.body;
-  if (!sesi_id || !lapangan || !Array.isArray(player_ids) || player_ids.length === 0) {
+  // Sekarang pakai pendaftaran_id (bukan player_id) supaya guest (tanpa akun/player_id) juga bisa main
+  const { sesi_id, lapangan, pendaftaran_ids } = req.body;
+  if (!sesi_id || !lapangan || !Array.isArray(pendaftaran_ids) || pendaftaran_ids.length === 0) {
     return res.status(400).json({ error: 'Data tidak lengkap' });
   }
 
-  // Pastikan lapangan ini lagi kosong (gak ada yang berstatus 'main' di situ untuk sesi ini)
   const { data: sedangMain } = await supabaseAdmin
     .from('pendaftaran_sesi')
     .select('id')
@@ -23,7 +23,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `Lapangan ${lapangan} masih dipakai. Selesaikan dulu game yang lagi jalan.` });
   }
 
-  // Catat sebagai game baru (histori) — waktu_input = saat game ini dimulai
   const { data: gameBaru, error: gameError } = await supabaseAdmin
     .from('game')
     .insert({ sesi_id, lapangan, input_by: profile.id })
@@ -32,15 +31,23 @@ export default async function handler(req, res) {
 
   if (gameError) return res.status(500).json({ error: gameError.message });
 
-  const rows = player_ids.map((player_id) => ({ game_id: gameBaru.id, player_id }));
+  // Ambil player_id (kalau ada) dari tiap pendaftaran, buat dicatat di histori game_pemain
+  const { data: baris } = await supabaseAdmin
+    .from('pendaftaran_sesi')
+    .select('id, player_id')
+    .in('id', pendaftaran_ids);
+
+  const rows = (baris || []).map((b) => ({
+    game_id: gameBaru.id,
+    player_id: b.player_id, // null buat guest, itu gak masalah (kolom sudah nullable)
+    pendaftaran_sesi_id: b.id,
+  }));
   await supabaseAdmin.from('game_pemain').insert(rows);
 
-  // Pindahkan pemain-pemain ini dari antrian ke status 'main' di lapangan tsb
   await supabaseAdmin
     .from('pendaftaran_sesi')
     .update({ status_main: 'main', lapangan_sekarang: lapangan })
-    .eq('sesi_id', sesi_id)
-    .in('player_id', player_ids);
+    .in('id', pendaftaran_ids);
 
   return res.status(200).json({ data: gameBaru });
 }
