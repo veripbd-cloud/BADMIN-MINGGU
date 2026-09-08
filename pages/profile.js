@@ -3,8 +3,9 @@ import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../lib/useAuth';
 import TopBar from '../components/TopBar';
 
-function hitungTenure(tanggal_daftar) {
-  const mulai = new Date(tanggal_daftar);
+function hitungTenure(profile) {
+  const sumber = profile.member_sejak || profile.tanggal_daftar;
+  const mulai = new Date(sumber);
   const now = new Date();
   const bulan = (now.getFullYear() - mulai.getFullYear()) * 12 + (now.getMonth() - mulai.getMonth());
   if (bulan < 1) return 'Baru gabung bulan ini';
@@ -15,6 +16,15 @@ export default function Profile() {
   const { profile, loading } = useAuth();
   const [riwayat, setRiwayat] = useState([]);
   const [outstanding, setOutstanding] = useState([]);
+  const [namaTampil, setNamaTampil] = useState('');
+  const [modeEdit, setModeEdit] = useState(false);
+  const [namaBaru, setNamaBaru] = useState('');
+  const [simpanMsg, setSimpanMsg] = useState('');
+  const [menyimpan, setMenyimpan] = useState(false);
+
+  useEffect(() => {
+    if (profile) setNamaTampil(profile.nama);
+  }, [profile]);
 
   useEffect(() => {
     async function load() {
@@ -37,13 +47,47 @@ export default function Profile() {
     load();
   }, [profile]);
 
+  async function simpanNama(e) {
+    e.preventDefault();
+    if (!namaBaru.trim()) return;
+    setMenyimpan(true);
+    setSimpanMsg('');
+    const { error } = await supabase
+      .from('profiles')
+      .update({ nama: namaBaru.trim() })
+      .eq('id', profile.id);
+    setMenyimpan(false);
+    if (error) {
+      setSimpanMsg('Gagal ganti nama: ' + error.message);
+      return;
+    }
+    setNamaTampil(namaBaru.trim());
+    setModeEdit(false);
+  }
+
   if (loading || !profile) return null;
 
   return (
     <div className="wrap">
       <TopBar profile={profile} />
-      <h1>{profile.nama}</h1>
-      <p className="subtle">{hitungTenure(profile.tanggal_daftar)}</p>
+
+      {modeEdit ? (
+        <form onSubmit={simpanNama} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 4 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ marginTop: 0 }}>Nama</label>
+            <input value={namaBaru} onChange={(e) => setNamaBaru(e.target.value)} autoFocus />
+          </div>
+          <button type="submit" disabled={menyimpan}>{menyimpan ? '...' : 'Simpan'}</button>
+          <button type="button" className="secondary" onClick={() => setModeEdit(false)}>Batal</button>
+        </form>
+      ) : (
+        <div className="card-row" style={{ marginBottom: 4 }}>
+          <h1 style={{ margin: 0 }}>{namaTampil}</h1>
+          <button className="secondary" onClick={() => { setNamaBaru(namaTampil); setModeEdit(true); }}>Ganti Nama</button>
+        </div>
+      )}
+      {simpanMsg && <p className="error">{simpanMsg}</p>}
+      <p className="subtle">{hitungTenure(profile)}</p>
 
       <div className="stat">
         <div className="item">
