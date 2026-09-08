@@ -70,7 +70,7 @@ export default function Home() {
   if (loading) return null;
 
   function sudahBerakhir(sesi) {
-    const batasAkhir = new Date(sesi.tanggal + 'T10:00:00');
+    const batasAkhir = new Date(sesi.tanggal + 'T10:00:00+07:00');
     return new Date() > batasAkhir;
   }
 
@@ -95,7 +95,7 @@ export default function Home() {
               <div>
                 <Link href={`/sesi/${sesi.id}`}><strong>{sesi.label || sesi.tanggal}</strong></Link>
                 <p className="subtle" style={{ margin: '4px 0 0', fontSize: 11 }}>
-                  Deadline batal: {new Date(sesi.deadline_batal).toLocaleString('id-ID')}
+                  Deadline batal: {new Date(sesi.deadline_batal).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB
                 </p>
               </div>
               <div style={{ textAlign: 'right' }}>
