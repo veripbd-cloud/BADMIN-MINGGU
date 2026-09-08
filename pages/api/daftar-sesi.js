@@ -6,6 +6,11 @@ export default async function handler(req, res) {
   const profile = await getProfileFromRequest(req);
   if (!profile) return res.status(401).json({ error: 'Belum login' });
 
+  const isAdminRole = profile.role === 'admin' || profile.role === 'super_admin';
+  if (profile.status_approval !== 'approved' && !isAdminRole) {
+    return res.status(403).json({ error: 'Akun kamu masih menunggu approval admin.' });
+  }
+
   const { sesi_id } = req.body;
   if (!sesi_id) return res.status(400).json({ error: 'sesi_id wajib diisi' });
 
@@ -24,9 +29,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Kamu sudah terdaftar di sesi ini.' });
   }
 
-  const tipe_slot = profile.tipe;
+  const tipe_slot = profile.tipe; // 'member' atau 'harian'
   const kuota = tipe_slot === 'member' ? sesi.kuota_member : sesi.kuota_harian;
 
+  // Hitung berapa yang sudah "terdaftar" (bukan waiting_list) untuk tipe ini
   const { count: terdaftarCount } = await supabaseAdmin
     .from('pendaftaran_sesi')
     .select('*', { count: 'exact', head: true })
@@ -39,6 +45,8 @@ export default async function handler(req, res) {
   let baru, error;
 
   if (barisLama) {
+    // Sudah pernah batal sebelumnya -> daftar ulang dengan cara UPDATE baris yang sama,
+    // bukan bikin baris baru (baris lama unik per sesi+player, jadi ini yang aman)
     ({ data: baru, error } = await supabaseAdmin
       .from('pendaftaran_sesi')
       .update({
