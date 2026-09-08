@@ -159,12 +159,18 @@ export default function AdminPage() {
         <div className="form-actions"><button type="submit">Buat Sesi</button></div>
       </form>
 
-      <h2>Approval Level — Member Baru ({pending.length})</h2>
+      <h2>Pending Approval ({pending.length})</h2>
+      <p className="subtle" style={{ fontSize: 11 }}>Akun baru gak bisa daftar sesi sampai di-approve di sini. Pilih level final buat langsung meng-approve.</p>
       {pending.length === 0 && <div className="empty">Tidak ada yang menunggu review.</div>}
       {pending.map((p) => (
         <div className="card" key={p.id}>
           <div className="card-row">
-            <span>{p.nama} <span className="badge">{p.tipe}</span></span>
+            <div>
+              <strong>{p.nama}</strong> <span className="badge">{p.tipe}</span>
+              <div className="subtle" style={{ fontSize: 11, marginTop: 4 }}>
+                Level usulan: <strong>{p.level_self || '-'}</strong> · Daftar: {new Date(p.tanggal_daftar).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' })}
+              </div>
+            </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button className="secondary" onClick={() => approveLevel(p.id, 'A1')}>A1</button>
               <button className="secondary" onClick={() => approveLevel(p.id, 'A2')}>A2</button>
