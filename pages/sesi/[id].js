@@ -6,6 +6,10 @@ import TopBar from '../../components/TopBar';
 
 const DAFTAR_LAPANGAN = ['A6', 'A7', 'A9', 'A10'];
 
+function namaPeserta(p, profiles) {
+  return profiles[p.player_id]?.nama || p.nama_guest || 'Guest';
+}
+
 export default function DetailSesi() {
   const router = useRouter();
   const { id } = router.query;
@@ -13,7 +17,8 @@ export default function DetailSesi() {
   const [sesi, setSesi] = useState(null);
   const [pendaftaran, setPendaftaran] = useState([]);
   const [profiles, setProfiles] = useState({});
-  const [pilihanPerLapangan, setPilihanPerLapangan] = useState({});
+  const [pilihanPerLapangan, setPilihanPerLapangan] = useState({}); // { A6: [pendaftaran_id, ...] }
+  const [namaGuestBaru, setNamaGuestBaru] = useState('');
   const [msg, setMsg] = useState('');
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
@@ -31,7 +36,7 @@ export default function DetailSesi() {
       .order('waktu_daftar', { ascending: true });
     setPendaftaran(pendaftaranData || []);
 
-    const ids = (pendaftaranData || []).map((p) => p.player_id);
+    const ids = (pendaftaranData || []).map((p) => p.player_id).filter(Boolean);
     if (ids.length) {
       const { data: profilesData } = await supabase.from('profiles').select('*').in('id', ids);
       const map = {};
@@ -44,9 +49,10 @@ export default function DetailSesi() {
 
   const terdaftarMember = pendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'member');
   const terdaftarHarian = pendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'harian');
+  const terdaftarGuest = pendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'guest');
   const waitingMember = pendaftaran.filter((p) => p.status_daftar === 'waiting_list' && p.tipe_slot === 'member');
   const waitingHarian = pendaftaran.filter((p) => p.status_daftar === 'waiting_list' && p.tipe_slot === 'harian');
-  const semuaTerdaftar = [...terdaftarMember, ...terdaftarHarian];
+  const semuaTerdaftar = [...terdaftarMember, ...terdaftarHarian, ...terdaftarGuest];
 
   const antrianMenunggu = semuaTerdaftar
     .filter((p) => p.waktu_checkin && p.status_main !== 'main')
@@ -94,12 +100,21 @@ export default function DetailSesi() {
     load();
   }
 
-  function togglePilihan(kodeLapangan, player_id) {
+  async function tambahGuest(e) {
+    e.preventDefault();
+    if (!namaGuestBaru.trim()) return;
+    setMsg('');
+    const hasil = await apiCall('/api/admin/tambah-guest', { sesi_id: id, nama_guest: namaGuestBaru.trim() });
+    if (hasil.ok) setNamaGuestBaru('');
+    load();
+  }
+
+  function togglePilihan(kodeLapangan, pendaftaran_id) {
     setPilihanPerLapangan((prev) => {
       const current = prev[kodeLapangan] || [];
-      const next = current.includes(player_id)
-        ? current.filter((x) => x !== player_id)
-        : [...current, player_id];
+      const next = current.includes(pendaftaran_id)
+        ? current.filter((x) => x !== pendaftaran_id)
+        : [...current, pendaftaran_id];
       return { ...prev, [kodeLapangan]: next };
     });
   }
@@ -108,7 +123,7 @@ export default function DetailSesi() {
     const pilihan = pilihanPerLapangan[kodeLapangan] || [];
     if (pilihan.length === 0) { setMsg('Pilih minimal 1 pemain dari antrian dulu'); return; }
     setMsg('');
-    await apiCall('/api/admin/mulai-main', { sesi_id: id, lapangan: kodeLapangan, player_ids: pilihan });
+    await apiCall('/api/admin/mulai-main', { sesi_id: id, lapangan: kodeLapangan, pendaftaran_ids: pilihan });
     setPilihanPerLapangan((prev) => ({ ...prev, [kodeLapangan]: [] }));
     load();
   }
@@ -121,7 +136,7 @@ export default function DetailSesi() {
 
   if (loading || !sesi) return null;
 
-  const sesiBerakhir = new Date() > new Date(sesi.tanggal + 'T10:00:00');
+  const sesiBerakhir = new Date() > new Date(sesi.tanggal + 'T10:00:00+07:00');
   const bisaAdminKontrol = isAdmin && !sesiBerakhir;
 
   return (
@@ -129,7 +144,7 @@ export default function DetailSesi() {
       <TopBar profile={profile} />
       <h1>{sesi.label || sesi.tanggal}</h1>
       <p className="subtle">
-        Deadline batal: {new Date(sesi.deadline_batal).toLocaleString('id-ID')} · Kuota: {sesi.kuota_member} member / {sesi.kuota_harian} harian
+        Deadline batal: {new Date(sesi.deadline_batal).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB · Kuota: {sesi.kuota_member} member / {sesi.kuota_harian} harian / {terdaftarGuest.length} guest
       </p>
       {sesiBerakhir && <p className="badge done" style={{ display: 'inline-block', marginBottom: 10 }}>Sesi sudah berakhir (lewat jam 10:00) — kontrol admin dikunci</p>}
       {msg && <p className="error">{msg}</p>}
@@ -140,13 +155,26 @@ export default function DetailSesi() {
       <h2>Terdaftar — Harian ({terdaftarHarian.length}/{sesi.kuota_harian})</h2>
       <ListPeserta items={terdaftarHarian} profiles={profiles} isAdmin={bisaAdminKontrol} onCheckin={checkin} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} />
 
+      <h2>Guest ({terdaftarGuest.length})</h2>
+      <p className="subtle" style={{ fontSize: 11 }}>Pemain dadakan yang ditambahkan langsung oleh admin, tanpa perlu akun. Ikut kena tagihan sama seperti harian saat ditandai Hadir.</p>
+      <ListPeserta items={terdaftarGuest} profiles={profiles} isAdmin={bisaAdminKontrol} onCheckin={checkin} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} />
+      {isAdmin && (
+        <form className="card" onSubmit={tambahGuest} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ marginTop: 0 }}>Nama guest baru</label>
+            <input value={namaGuestBaru} onChange={(e) => setNamaGuestBaru(e.target.value)} placeholder="misal: Teman si Andi" />
+          </div>
+          <button type="submit" disabled={!bisaAdminKontrol}>Tambah Guest</button>
+        </form>
+      )}
+
       {(waitingMember.length > 0 || waitingHarian.length > 0) && (
         <>
           <h2>Waiting List (Sesi)</h2>
           {waitingMember.map((p, idx) => (
             <div className="card" key={p.id}>
               <div className="card-row">
-                <span>#{idx + 1} {profiles[p.player_id]?.nama} <span className="badge">member</span></span>
+                <span>#{idx + 1} {namaPeserta(p, profiles)} <span className="badge">member</span></span>
                 {bisaAdminKontrol && <button className="secondary" onClick={() => promosikan(p.id)}>Naikkan</button>}
               </div>
             </div>
@@ -154,7 +182,7 @@ export default function DetailSesi() {
           {waitingHarian.map((p, idx) => (
             <div className="card" key={p.id}>
               <div className="card-row">
-                <span>#{idx + 1} {profiles[p.player_id]?.nama} <span className="badge">harian</span></span>
+                <span>#{idx + 1} {namaPeserta(p, profiles)} <span className="badge">harian</span></span>
                 {bisaAdminKontrol && <button className="secondary" onClick={() => promosikan(p.id)}>Naikkan</button>}
               </div>
             </div>
@@ -182,7 +210,7 @@ export default function DetailSesi() {
                       <div style={{ marginBottom: 10 }}>
                         {pemain.map((p) => (
                           <div key={p.id} style={{ fontSize: 14, marginBottom: 4 }}>
-                            {profiles[p.player_id]?.nama} <span className="subtle" style={{ fontSize: 12 }}>({p.jumlah_game}x sebelumnya)</span>
+                            {namaPeserta(p, profiles)} <span className="subtle" style={{ fontSize: 12 }}>({p.jumlah_game}x sebelumnya)</span>
                           </div>
                         ))}
                       </div>
@@ -196,16 +224,16 @@ export default function DetailSesi() {
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                         {antrianMenunggu.length === 0 && <span className="subtle" style={{ fontSize: 13 }}>Antrian kosong.</span>}
                         {antrianMenunggu.map((p) => {
-                          const terpilih = (pilihanPerLapangan[kode] || []).includes(p.player_id);
+                          const terpilih = (pilihanPerLapangan[kode] || []).includes(p.id);
                           return (
                             <button
                               key={p.id}
                               type="button"
                               className={terpilih ? '' : 'secondary'}
                               style={{ fontSize: 13, padding: '6px 10px' }}
-                              onClick={() => togglePilihan(kode, p.player_id)}
+                              onClick={() => togglePilihan(kode, p.id)}
                             >
-                              {profiles[p.player_id]?.nama}
+                              {namaPeserta(p, profiles)}
                             </button>
                           );
                         })}
@@ -229,8 +257,8 @@ export default function DetailSesi() {
           {antrianMenunggu.map((p, idx) => (
             <div className="card" key={p.id}>
               <div className="card-row">
-                <span>{idx + 1}. {profiles[p.player_id]?.nama} — {p.jumlah_game}x main</span>
-                <span className="badge">sejak {new Date(p.waktu_checkin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
+                <span>{idx + 1}. {namaPeserta(p, profiles)} — {p.jumlah_game}x main</span>
+                <span className="badge">sejak {new Date(p.waktu_checkin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })} WIB</span>
               </div>
             </div>
           ))}
@@ -241,7 +269,7 @@ export default function DetailSesi() {
               {belumCheckin.map((p) => (
                 <div className="card" key={p.id}>
                   <div className="card-row">
-                    <span>{profiles[p.player_id]?.nama}</span>
+                    <span>{namaPeserta(p, profiles)}</span>
                     <button className="secondary" disabled={!bisaAdminKontrol} onClick={() => checkin(p.id)}>Check-in</button>
                   </div>
                 </div>
@@ -257,14 +285,13 @@ export default function DetailSesi() {
 function ListPeserta({ items, profiles, isAdmin, onCheckin, onTandai, onBatalkan }) {
   if (items.length === 0) return <div className="empty">Belum ada.</div>;
   return items.map((p) => {
-    const prof = profiles[p.player_id];
     return (
       <div className="card" key={p.id}>
         <div className="card-row">
           <div>
-            <strong>{prof?.nama}</strong>
+            <strong>{namaPeserta(p, profiles)}</strong>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-              {p.waktu_checkin ? `Check-in ${new Date(p.waktu_checkin).toLocaleTimeString('id-ID')}` : 'Belum check-in'}
+              {p.waktu_checkin ? `Check-in ${new Date(p.waktu_checkin).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB` : 'Belum check-in'}
               {' · '}{p.jumlah_game}x main
               {p.status_main === 'main' && p.lapangan_sekarang && ` · Sedang di ${p.lapangan_sekarang}`}
               {p.status_hadir && ` · ${p.status_hadir === 'hadir' ? 'Hadir' : 'No-show'}`}
