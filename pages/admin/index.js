@@ -69,7 +69,7 @@ export default function AdminPage() {
     // Deadline batal = persis jam 00:00 di tanggal sesi itu sendiri.
     // Setelah lewat tengah malam menuju hari sesi, batal otomatis tidak bisa lagi
     // (hanya admin yang bisa ubah manual lewat Supabase kalau perlu).
-    const tanggalSesi = new Date(sesiForm.tanggal + 'T00:00:00');
+    const tanggalSesi = new Date(sesiForm.tanggal + 'T00:00:00+07:00');
     const deadline = new Date(tanggalSesi);
 
     const token = await getAccessToken();
@@ -129,6 +129,8 @@ export default function AdminPage() {
         <input value={pengaturan.kuota_harian || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_harian: e.target.value })} />
         <label>Kuota total per sesi</label>
         <input value={pengaturan.kuota_total || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_total: e.target.value })} />
+        <label>Kuota guest per sesi (pemain dadakan tanpa akun)</label>
+        <input value={pengaturan.kuota_guest || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_guest: e.target.value })} />
         <label>Biaya lapangan per bulan (Rp)</label>
         <input
           value={formatRibuan(pengaturan.biaya_lapangan_bulanan)}
