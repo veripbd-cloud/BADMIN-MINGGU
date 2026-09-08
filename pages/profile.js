@@ -72,6 +72,18 @@ export default function Profile() {
     else location.reload();
   }
 
+  async function simpanLevelSelf(levelBaru) {
+    setSimpanMsg('');
+    // Ini cuma update level_self (usulan sendiri) — level_final tetap keputusan admin,
+    // gak kesentuh sama sekali dari sini.
+    const { error } = await supabase
+      .from('profiles')
+      .update({ level_self: levelBaru })
+      .eq('id', profile.id);
+    if (error) setSimpanMsg('Gagal ganti level: ' + error.message);
+    else location.reload();
+  }
+
   if (loading || !profile) return null;
 
   return (
@@ -109,8 +121,22 @@ export default function Profile() {
           </select>
         </div>
         <div className="item">
-          <span className="label">Level</span>
-          <span className="num">{profile.level_final || 'Belum di-review'}</span>
+          <span className="label">Level (usulan)</span>
+          <select
+            value={profile.level_self || ''}
+            onChange={(e) => simpanLevelSelf(e.target.value)}
+            style={{ width: 'auto', marginTop: 2 }}
+          >
+            <option value="">-</option>
+            <option value="A1">A1</option>
+            <option value="A2">A2</option>
+            <option value="B1">B1</option>
+            <option value="B2">B2</option>
+            <option value="C">C</option>
+          </select>
+          <div className="subtle" style={{ fontSize: 11, marginTop: 4 }}>
+            Final: {profile.level_final || '-'} {profile.status_approval !== 'approved' && '(menunggu admin)'}
+          </div>
         </div>
         <div className="item">
           <span className="label">Status akun</span>
