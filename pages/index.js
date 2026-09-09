@@ -7,7 +7,8 @@ import TopBar from '../components/TopBar';
 export default function Home() {
   const { profile, loading } = useAuth();
   const [sesiList, setSesiList] = useState([]);
-  const [pendaftaranSaya, setPendaftaranSaya] = useState({}); // sesi_id -> pendaftaran
+  const [pendaftaranSaya, setPendaftaranSaya] = useState({});
+  const [jumlahTerisi, setJumlahTerisi] = useState({}); // sesi_id -> jumlah terdaftar di tipe kita
   const [busy, setBusy] = useState(null);
   const [msg, setMsg] = useState('');
 
@@ -29,6 +30,22 @@ export default function Home() {
         if (p.status_daftar !== 'batal') map[p.sesi_id] = p;
       });
       setPendaftaranSaya(map);
+
+      // Hitung berapa slot TIPE KITA yang udah terisi di tiap sesi, buat tau penuh apa belum
+      const sesiIds = (sesi || []).map((s) => s.id);
+      if (sesiIds.length && profile.tipe) {
+        const { data: terdaftarSemua } = await supabase
+          .from('pendaftaran_sesi')
+          .select('sesi_id')
+          .in('sesi_id', sesiIds)
+          .eq('status_daftar', 'terdaftar')
+          .eq('tipe_slot', profile.tipe);
+        const countMap = {};
+        (terdaftarSemua || []).forEach((row) => {
+          countMap[row.sesi_id] = (countMap[row.sesi_id] || 0) + 1;
+        });
+        setJumlahTerisi(countMap);
+      }
     }
   }
 
@@ -74,7 +91,6 @@ export default function Home() {
     return new Date() > batasAkhir;
   }
 
-  // Akun yang belum di-approve admin (bukan admin/super_admin) tidak bisa lihat/daftar sesi
   const isAdminRole = profile && (profile.role === 'admin' || profile.role === 'super_admin');
   if (profile && profile.status_approval !== 'approved' && !isAdminRole) {
     return (
@@ -110,6 +126,10 @@ export default function Home() {
         const lewatDeadline = new Date() > new Date(sesi.deadline_batal);
         const berakhir = sudahBerakhir(sesi);
 
+        const kuotaTipe = profile?.tipe === 'member' ? sesi.kuota_member : sesi.kuota_harian;
+        const terisi = jumlahTerisi[sesi.id] || 0;
+        const penuh = terisi >= kuotaTipe;
+
         return (
           <div className="card" key={sesi.id}>
             <div className="card-row">
@@ -129,15 +149,19 @@ export default function Home() {
                     </span>
                     {!lewatDeadline && (
                       <div style={{ marginTop: 8 }}>
-                        <button className="secondary" disabled={busy === p.id} onClick={() => batal(p.id)}>
+                        <button className="badge-btn" disabled={busy === p.id} onClick={() => batal(p.id)}>
                           {busy === p.id ? '...' : 'Batal'}
                         </button>
                       </div>
                     )}
                   </>
                 ) : (
-                  <button disabled={busy === sesi.id || sesi.status !== 'buka'} onClick={() => daftar(sesi.id)}>
-                    {busy === sesi.id ? '...' : 'Daftar'}
+                  <button
+                    className={penuh ? 'secondary' : ''}
+                    disabled={busy === sesi.id || sesi.status !== 'buka'}
+                    onClick={() => daftar(sesi.id)}
+                  >
+                    {busy === sesi.id ? '...' : penuh ? 'FULL — Gabung Waiting List' : 'Daftar'}
                   </button>
                 )}
               </div>

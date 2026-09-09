@@ -19,9 +19,11 @@ export default function Kas() {
   const [profilesMap, setProfilesMap] = useState({});
   const [form, setForm] = useState({ jenis: 'pengeluaran', kategori: 'bola', nominal: '', keterangan: '' });
   const [msg, setMsg] = useState('');
-  const [processingId, setProcessingId] = useState(null); // kunci tombol yang lagi diproses
+  const [processingId, setProcessingId] = useState(null);
   const [stokLog, setStokLog] = useState([]);
   const [stokForm, setStokForm] = useState({ arah: 'tambah', slop: '', piece: '' });
+  const [showSemuaTransaksi, setShowSemuaTransaksi] = useState(false);
+  const [showSemuaStok, setShowSemuaStok] = useState(false);
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
@@ -32,7 +34,6 @@ export default function Kas() {
     const { data: o } = await supabase.from('outstanding').select('*').eq('status', 'belum_lunas');
     setOutstanding(o || []);
 
-    // Gabungkan semua player_id yang perlu ditampilkan namanya: dari outstanding DAN dari transaksi
     const idsOutstanding = (o || []).map((x) => x.player_id);
     const idsTransaksi = (t || []).map((x) => x.player_id).filter(Boolean);
     const ids = [...new Set([...idsOutstanding, ...idsTransaksi])];
@@ -52,6 +53,19 @@ export default function Kas() {
   }
 
   useEffect(() => { if (!loading) load(); }, [loading]);
+
+  if (loading) return null;
+
+  const bolehLihatKas = profile && (profile.tipe === 'member' || isAdmin);
+  if (!bolehLihatKas) {
+    return (
+      <div className="wrap">
+        <TopBar profile={profile} />
+        <h1>Kas</h1>
+        <div className="empty">Halaman ini cuma buat member.</div>
+      </div>
+    );
+  }
 
   const saldo = transaksi.reduce((sum, t) => sum + (t.jenis === 'pemasukan' ? t.nominal : -t.nominal), 0);
   const totalOutstanding = outstanding.reduce((sum, o) => sum + o.nominal, 0);
@@ -75,7 +89,7 @@ export default function Kas() {
   }
 
   async function lunasi(outstanding_id) {
-    if (processingId) return; // sedang ada proses lain -> abaikan klik lain
+    if (processingId) return;
     setProcessingId(outstanding_id);
     setMsg('');
     const token = await getAccessToken();
@@ -109,19 +123,6 @@ export default function Kas() {
     if (!res.ok) { setMsg(json.error); return; }
     setStokForm({ arah: 'tambah', slop: '', piece: '' });
     load();
-  }
-
-  if (loading) return null;
-
-  const bolehLihatKas = profile && (profile.tipe === 'member' || isAdmin);
-  if (!bolehLihatKas) {
-    return (
-      <div className="wrap">
-        <TopBar profile={profile} />
-        <h1>Kas</h1>
-        <div className="empty">Halaman ini cuma buat member.</div>
-      </div>
-    );
   }
 
   return (
@@ -195,21 +196,28 @@ export default function Kas() {
       </div>
 
       {stokLog.length > 0 && (
-        <table style={{ marginBottom: 20 }}>
-          <thead>
-            <tr><th>Waktu</th><th>Arah</th><th>Jumlah</th><th>Saldo Setelah</th></tr>
-          </thead>
-          <tbody>
-            {stokLog.map((s) => (
-              <tr key={s.id}>
-                <td>{new Date(s.waktu).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</td>
-                <td style={{ color: s.arah === 'tambah' ? '#9ed6b0' : '#e8988c' }}>{s.arah}</td>
-                <td>{s.arah === 'tambah' ? '+' : '-'}{Math.abs(s.delta_piece)} piece ({s.slop} slop {s.piece} piece)</td>
-                <td>{Math.floor(s.saldo_setelah / 12)} slop {s.saldo_setelah % 12} piece</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <>
+          <table style={{ marginBottom: 8 }}>
+            <thead>
+              <tr><th>Waktu</th><th>Arah</th><th>Jumlah</th><th>Saldo Setelah</th></tr>
+            </thead>
+            <tbody>
+              {(showSemuaStok ? stokLog : stokLog.slice(0, 5)).map((s) => (
+                <tr key={s.id}>
+                  <td>{new Date(s.waktu).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</td>
+                  <td style={{ color: s.arah === 'tambah' ? '#9ed6b0' : '#e8988c' }}>{s.arah}</td>
+                  <td>{s.arah === 'tambah' ? '+' : '-'}{Math.abs(s.delta_piece)} piece ({s.slop} slop {s.piece} piece)</td>
+                  <td>{Math.floor(s.saldo_setelah / 12)} slop {s.saldo_setelah % 12} piece</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {stokLog.length > 5 && (
+            <button className="secondary" style={{ marginBottom: 20 }} onClick={() => setShowSemuaStok(!showSemuaStok)}>
+              {showSemuaStok ? 'Tampilkan 5 Terbaru' : `Lihat Semua (${stokLog.length})`}
+            </button>
+          )}
+        </>
       )}
 
       {isAdmin && (
@@ -250,7 +258,7 @@ export default function Kas() {
           <tr><th>Tanggal</th><th>Jenis</th><th>Kategori</th><th>Nominal</th><th>Pemain</th><th>Keterangan</th></tr>
         </thead>
         <tbody>
-          {transaksi.map((t) => (
+          {(showSemuaTransaksi ? transaksi : transaksi.slice(0, 5)).map((t) => (
             <tr key={t.id}>
               <td>{new Date(t.tanggal).toLocaleDateString('id-ID')}</td>
               <td>{t.jenis}</td>
@@ -264,6 +272,11 @@ export default function Kas() {
           ))}
         </tbody>
       </table>
+      {transaksi.length > 5 && (
+        <button className="secondary" style={{ marginTop: 8 }} onClick={() => setShowSemuaTransaksi(!showSemuaTransaksi)}>
+          {showSemuaTransaksi ? 'Tampilkan 5 Terbaru' : `Lihat Semua (${transaksi.length})`}
+        </button>
+      )}
     </div>
   );
 }

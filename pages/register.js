@@ -31,8 +31,6 @@ export default function Register() {
       return;
     }
 
-    // Buat baris profil. Kalau project Supabase mengaktifkan "confirm email",
-    // user.id tetap ada di sini walau belum bisa langsung login.
     const userId = data.user?.id;
     if (userId) {
       const { error: profileError } = await supabase.from('profiles').insert({
@@ -60,7 +58,7 @@ export default function Register() {
       <h1>Daftar Akun</h1>
       <p className="subtle">
         Level yang lu isi di bawah cuma referensi awal — level final tetap ditentukan admin.
-        Lu tetap boleh langsung ikut absen sesi minggu ini sambil menunggu review.
+        Akun kamu perlu di-approve admin dulu sebelum bisa ikut daftar sesi.
       </p>
       <form onSubmit={handleRegister}>
         <label>Nama</label>

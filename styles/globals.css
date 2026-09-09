@@ -118,12 +118,25 @@ p.subtle { color: var(--muted); margin-top: 0; }
 .badge.warn { border-color: var(--clay-red); color: #e8988c; }
 .badge.done { border-color: #5f7d70; color: #7fa393; }
 
+.badge-btn {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--shuttle-yellow);
+  background: transparent;
+  color: var(--shuttle-yellow);
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+.badge-btn.danger-outline { border-color: var(--clay-red); color: #e8988c; }
+
 button, .btn {
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 600;
-  padding: 8px 14px;
-  border-radius: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
   border: none;
   cursor: pointer;
   background: var(--shuttle-yellow);

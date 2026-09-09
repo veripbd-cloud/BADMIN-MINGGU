@@ -17,7 +17,7 @@ export default function DetailSesi() {
   const [sesi, setSesi] = useState(null);
   const [pendaftaran, setPendaftaran] = useState([]);
   const [profiles, setProfiles] = useState({});
-  const [pilihanPerLapangan, setPilihanPerLapangan] = useState({}); // { A6: [pendaftaran_id, ...] }
+  const [pilihanPerLapangan, setPilihanPerLapangan] = useState({});
   const [namaGuestBaru, setNamaGuestBaru] = useState('');
   const [msg, setMsg] = useState('');
 
@@ -79,18 +79,11 @@ export default function DetailSesi() {
     return { ok: res.ok, json };
   }
 
-  async function checkin(pendaftaran_id) {
-    await apiCall('/api/admin/checkin', { pendaftaran_id });
-    load();
-  }
-
   async function tandaiHadir(pendaftaran_id, status_hadir) {
     await apiCall('/api/admin/tandai-hadir', { pendaftaran_id, status_hadir });
     load();
   }
 
-  // Tombol "Hadir" di UI sekarang memicu checkin + tandai hadir sekaligus (2 endpoint lama
-  // tetap dipanggil keduanya, cuma disatukan jadi 1 aksi biar gak perlu klik 2 kali).
   async function hadirGabungan(pendaftaran_id) {
     await apiCall('/api/admin/checkin', { pendaftaran_id });
     await apiCall('/api/admin/tandai-hadir', { pendaftaran_id, status_hadir: 'hadir' });

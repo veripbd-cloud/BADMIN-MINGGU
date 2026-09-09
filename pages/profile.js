@@ -74,8 +74,6 @@ export default function Profile() {
 
   async function simpanLevelSelf(levelBaru) {
     setSimpanMsg('');
-    // Ini cuma update level_self (usulan sendiri) — level_final tetap keputusan admin,
-    // gak kesentuh sama sekali dari sini.
     const { error } = await supabase
       .from('profiles')
       .update({ level_self: levelBaru })
@@ -170,7 +168,7 @@ export default function Profile() {
           <div className="card-row">
             <span>{r.sesi?.label || r.sesi?.tanggal}</span>
             <span className={`badge ${r.status_hadir === 'hadir' ? 'done' : r.status_hadir === 'no_show' ? 'warn' : ''}`}>
-              {r.status_hadir === 'hadir' ? 'Hadir' : r.status_hadir === 'no_show' ? 'No-show' : r.status_daftar}
+              {r.status_hadir === 'hadir' ? 'Hadir' : r.status_hadir === 'no_show' ? 'Tidak Hadir' : r.status_daftar === 'terdaftar' ? 'Terdaftar' : 'Waiting list'}
             </span>
           </div>
         </div>

@@ -72,10 +72,6 @@ export default function AdminPage() {
   async function buatSesi(e) {
     e.preventDefault();
     setMsg('');
-    // Deadline batal = Sabtu 23:59 sebelum tanggal sesi (sesuai pengaturan default)
-    // Deadline batal = persis jam 00:00 di tanggal sesi itu sendiri.
-    // Setelah lewat tengah malam menuju hari sesi, batal otomatis tidak bisa lagi
-    // (hanya admin yang bisa ubah manual lewat Supabase kalau perlu).
     const tanggalSesi = new Date(sesiForm.tanggal + 'T00:00:00+07:00');
     const deadline = new Date(tanggalSesi);
 
