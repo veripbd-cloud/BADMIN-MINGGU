@@ -30,17 +30,19 @@ export default async function handler(req, res) {
   }
 
   const tipe_slot = profile.tipe; // 'member' atau 'harian'
-  const kuota = tipe_slot === 'member' ? sesi.kuota_member : sesi.kuota_harian;
 
-  // Hitung berapa yang sudah "terdaftar" (bukan waiting_list) untuk tipe ini
-  const { count: terdaftarCount } = await supabaseAdmin
+  // KOLAM BERSAMA: max 30 orang total (member + harian, TIDAK termasuk guest yang punya
+  // kuota terpisah sendiri). Member otomatis udah "ambil tempat duluan" pas sesi dibikin
+  // (auto-join), jadi kalau member narik diri (batal), otomatis nambah ruang buat harian
+  // tanpa pernah melebihi 30 total.
+  const { count: totalTerdaftar } = await supabaseAdmin
     .from('pendaftaran_sesi')
     .select('*', { count: 'exact', head: true })
     .eq('sesi_id', sesi_id)
-    .eq('tipe_slot', tipe_slot)
-    .eq('status_daftar', 'terdaftar');
+    .eq('status_daftar', 'terdaftar')
+    .neq('tipe_slot', 'guest');
 
-  const status_daftar = (terdaftarCount ?? 0) < kuota ? 'terdaftar' : 'waiting_list';
+  const status_daftar = (totalTerdaftar ?? 0) < sesi.kuota_total ? 'terdaftar' : 'waiting_list';
 
   let baru, error;
 

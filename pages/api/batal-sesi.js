@@ -39,13 +39,16 @@ export default async function handler(req, res) {
   if (updateError) return res.status(500).json({ error: updateError.message });
 
   // Kalau yang batal sebelumnya mengisi slot "terdaftar" (bukan waiting_list),
-  // promosikan orang paling depan di waiting list DENGAN TIPE YANG SAMA (FIFO per tipe).
+  // promosikan orang PALING DEPAN di waiting list SESI INI (global, gak dibatasi tipe lagi).
+  // Ini yang bikin "member narik diri otomatis nambah slot buat harian" jalan sendiri:
+  // gak ada lagi "waiting list member" (semua member udah auto-join dari awal), jadi
+  // slot yang kebuka otomatis kepakai sama harian paling depan di antrian, tanpa
+  // pernah melebihi total kuota (30) sesi ini.
   if (statusSebelumnya === 'terdaftar') {
     const { data: waitingTerdepan } = await supabaseAdmin
       .from('pendaftaran_sesi')
       .select('*')
       .eq('sesi_id', pendaftaran.sesi_id)
-      .eq('tipe_slot', pendaftaran.tipe_slot)
       .eq('status_daftar', 'waiting_list')
       .order('waktu_daftar', { ascending: true })
       .limit(1)
