@@ -29,6 +29,17 @@ export default async function handler(req, res) {
     .update({ status_daftar: 'batal' })
     .eq('id', pendaftaran_id);
 
+  // Hapus outstanding yang nempel di pendaftaran ini KALAU BELUM DIBAYAR.
+  // Kalau udah kadung "lunas" (udah kebayar & udah tercatat masuk kas), sengaja TIDAK
+  // dihapus di sini — itu duit yang beneran udah masuk, penghapusan/refund itu
+  // keputusan manual, bukan otomatis.
+  await supabaseAdmin
+    .from('outstanding')
+    .delete()
+    .eq('sumber', 'tagihan_harian')
+    .eq('referensi_id', pendaftaran_id)
+    .eq('status', 'belum_lunas');
+
   // Kalau yang dibatalkan tadi mengisi slot "terdaftar", secara default tetap coba
   // promosikan antrian dengan TIPE YANG SAMA duluan (member -> member, harian -> harian).
   // Kalau admin mau kasih slot itu ke tipe lain (misal slot member dikasih ke harian),
