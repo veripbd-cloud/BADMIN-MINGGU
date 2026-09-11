@@ -40,16 +40,13 @@ export default async function handler(req, res) {
     .eq('referensi_id', pendaftaran_id)
     .eq('status', 'belum_lunas');
 
-  // Kalau yang dibatalkan tadi mengisi slot "terdaftar", secara default tetap coba
-  // promosikan antrian dengan TIPE YANG SAMA duluan (member -> member, harian -> harian).
-  // Kalau admin mau kasih slot itu ke tipe lain (misal slot member dikasih ke harian),
-  // itu dilakukan manual lewat tombol "Naikkan" di waiting list tipe lain setelahnya.
+  // Promosikan orang PALING DEPAN di waiting list SESI INI (global, gak dibatasi tipe).
+  // Ini yang bikin "member ditarik admin -> otomatis nambah slot buat harian" jalan sendiri.
   if (statusSebelumnya === 'terdaftar') {
     const { data: waitingTerdepan } = await supabaseAdmin
       .from('pendaftaran_sesi')
       .select('*')
       .eq('sesi_id', pendaftaran.sesi_id)
-      .eq('tipe_slot', pendaftaran.tipe_slot)
       .eq('status_daftar', 'waiting_list')
       .order('waktu_daftar', { ascending: true })
       .limit(1)

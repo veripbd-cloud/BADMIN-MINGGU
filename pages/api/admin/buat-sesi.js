@@ -26,5 +26,25 @@ export default async function handler(req, res) {
     .single();
 
   if (error) return res.status(500).json({ error: error.message });
-  return res.status(200).json({ data });
+
+  // Auto-daftarkan SEMUA member yang statusnya sudah approved (member baru yang baru
+  // di-approve juga otomatis ikut, gak ada perlakuan beda dari member lama).
+  const { data: semuaMember } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('tipe', 'member')
+    .eq('status_approval', 'approved');
+
+  if (semuaMember && semuaMember.length > 0) {
+    const rows = semuaMember.map((m) => ({
+      sesi_id: data.id,
+      player_id: m.id,
+      tipe_slot: 'member',
+      status_daftar: 'terdaftar',
+      waktu_daftar: new Date().toISOString(),
+    }));
+    await supabaseAdmin.from('pendaftaran_sesi').insert(rows);
+  }
+
+  return res.status(200).json({ data, jumlah_member_auto_join: semuaMember?.length || 0 });
 }
