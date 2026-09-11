@@ -72,8 +72,16 @@ export default function AdminPage() {
   async function buatSesi(e) {
     e.preventDefault();
     setMsg('');
-    const tanggalSesi = new Date(sesiForm.tanggal + 'T00:00:00+07:00');
-    const deadline = new Date(tanggalSesi);
+    // Deadline batal = H-1 (sehari sebelum sesi) jam 23:59 WIB — sesuai pengaturan
+    // deadline_batal_hari/deadline_batal_jam. Dihitung pakai UTC math + offset eksplisit
+    // +07:00 (BUKAN setDate/setHours) biar gak gantung timezone device admin sama sekali.
+    const [y, m, d] = sesiForm.tanggal.split('-').map(Number);
+    const tanggalMinus1 = new Date(Date.UTC(y, m - 1, d));
+    tanggalMinus1.setUTCDate(tanggalMinus1.getUTCDate() - 1);
+    const yyyy = tanggalMinus1.getUTCFullYear();
+    const mm = String(tanggalMinus1.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(tanggalMinus1.getUTCDate()).padStart(2, '0');
+    const deadline = new Date(`${yyyy}-${mm}-${dd}T23:59:00+07:00`);
 
     const token = await getAccessToken();
     const res = await fetch('/api/admin/buat-sesi', {
@@ -149,8 +157,9 @@ export default function AdminPage() {
         <label>Label (opsional)</label>
         <input placeholder="misal: Week 5 - 12 September 2026" value={sesiForm.label} onChange={(e) => setSesiForm({ ...sesiForm, label: e.target.value })} />
         <p className="subtle" style={{ fontSize: 11 }}>
-          Sesi main jam 07:00–10:00 di tanggal ini. Deadline batal otomatis: tepat jam 00:00 di tanggal sesi
-          (setelah itu batal harus lewat admin). Sesi otomatis dianggap selesai begitu lewat jam 10:00.
+          Sesi main jam 07:00–10:00 di tanggal ini. Deadline batal otomatis: H-1 (sehari sebelumnya)
+          jam 23:59 WIB (setelah itu batal harus lewat admin). Sesi otomatis dianggap selesai begitu
+          lewat jam 10:00.
         </p>
         <div className="form-actions"><button type="submit">Buat Sesi</button></div>
       </form>
