@@ -54,12 +54,11 @@ export default function DetailSesi() {
   const waitingHarian = pendaftaran.filter((p) => p.status_daftar === 'waiting_list' && p.tipe_slot === 'harian');
   const semuaTerdaftar = [...terdaftarMember, ...terdaftarHarian, ...terdaftarGuest];
 
+  // FIFO murni: siapa check-in paling duluan, main paling duluan — gak peduli udah
+  // main berapa kali. jumlah_game cuma buat info tampilan, gak dipakai buat urutan.
   const antrianMenunggu = semuaTerdaftar
     .filter((p) => p.waktu_checkin && p.status_main !== 'main')
-    .sort((a, b) => {
-      if (a.jumlah_game !== b.jumlah_game) return a.jumlah_game - b.jumlah_game;
-      return new Date(a.waktu_checkin) - new Date(b.waktu_checkin);
-    });
+    .sort((a, b) => new Date(a.waktu_checkin) - new Date(b.waktu_checkin));
 
   const belumCheckin = semuaTerdaftar.filter((p) => !p.waktu_checkin);
 
