@@ -65,23 +65,6 @@ export default function Profile() {
     setModeEdit(false);
   }
 
-  async function simpanTipe(tipeBaru) {
-    setSimpanMsg('');
-    const { error } = await supabase.from('profiles').update({ tipe: tipeBaru }).eq('id', profile.id);
-    if (error) setSimpanMsg('Gagal ganti status: ' + error.message);
-    else location.reload();
-  }
-
-  async function simpanLevelSelf(levelBaru) {
-    setSimpanMsg('');
-    const { error } = await supabase
-      .from('profiles')
-      .update({ level_self: levelBaru })
-      .eq('id', profile.id);
-    if (error) setSimpanMsg('Gagal ganti level: ' + error.message);
-    else location.reload();
-  }
-
   if (loading || !profile) return null;
 
   return (
@@ -117,32 +100,16 @@ export default function Profile() {
       <div className="stat">
         <div className="item">
           <span className="label">Status</span>
-          <select
-            value={profile.tipe}
-            onChange={(e) => simpanTipe(e.target.value)}
-            style={{ width: 'auto', marginTop: 2 }}
-          >
-            <option value="member">Member</option>
-            <option value="harian">Harian</option>
-          </select>
+          <span className="num">{profile.tipe === 'member' ? 'Member' : 'Harian'}</span>
         </div>
         <div className="item">
-          <span className="label">Level (usulan)</span>
-          <select
-            value={profile.level_self || ''}
-            onChange={(e) => simpanLevelSelf(e.target.value)}
-            style={{ width: 'auto', marginTop: 2 }}
-          >
-            <option value="">-</option>
-            <option value="A1">A1</option>
-            <option value="A2">A2</option>
-            <option value="B1">B1</option>
-            <option value="B2">B2</option>
-            <option value="C">C</option>
-          </select>
-          <div className="subtle" style={{ fontSize: 11, marginTop: 4 }}>
-            Final: {profile.level_final || '-'} {profile.status_approval !== 'approved' && '(menunggu admin)'}
-          </div>
+          <span className="label">Level</span>
+          <span className="num">{profile.level_final || 'Belum di-review'}</span>
+          {profile.level_self && (
+            <div className="subtle" style={{ fontSize: 11, marginTop: 4 }}>
+              Usulan: {profile.level_self} {profile.status_approval !== 'approved' && '(menunggu admin)'}
+            </div>
+          )}
         </div>
         <div className="item">
           <span className="label">Status akun</span>
