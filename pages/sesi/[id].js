@@ -28,6 +28,20 @@ export default function DetailSesi() {
     const { data: sesiData } = await supabase.from('sesi').select('*').eq('id', id).single();
     setSesi(sesiData);
 
+    // Kalau sesi udah lewat jam 10:00 dan yang buka ini admin, otomatis tandai no-show
+    // buat harian/guest yang gak pernah diklik hadir sama sekali. Aman dipanggil berkali-kali.
+    if (sesiData && isAdmin) {
+      const sudahLewat = new Date() > new Date(sesiData.tanggal + 'T10:00:00+07:00');
+      if (sudahLewat) {
+        const token = await getAccessToken();
+        await fetch('/api/admin/auto-noshow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ sesi_id: id }),
+        });
+      }
+    }
+
     const { data: pendaftaranData } = await supabase
       .from('pendaftaran_sesi')
       .select('*')
@@ -45,7 +59,7 @@ export default function DetailSesi() {
     }
   }
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); }, [id, isAdmin]);
 
   const terdaftarMember = pendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'member');
   const terdaftarHarian = pendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'harian');
