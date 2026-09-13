@@ -43,6 +43,7 @@ export default async function handler(req, res) {
     nominal: outstanding.nominal,
     keterangan: `Pelunasan outstanding: ${outstanding.keterangan || ''}`,
     player_id: outstanding.player_id,
+    nama_guest: outstanding.nama_guest || null,
     input_by: profile.id,
   });
 

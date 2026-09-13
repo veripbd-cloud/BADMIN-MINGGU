@@ -52,6 +52,7 @@ export default async function handler(req, res) {
     if (!sudahAda) {
       await supabaseAdmin.from('outstanding').insert({
         player_id: pendaftaran.player_id,
+        nama_guest: pendaftaran.nama_guest || null,
         sumber: 'tagihan_harian',
         referensi_id: pendaftaran_id,
         nominal,
