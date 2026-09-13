@@ -148,7 +148,7 @@ export default function Kas() {
         <div className="card outstanding-item" key={o.id}>
           <div className="card-row">
             <div>
-              <strong>{profilesMap[o.player_id] || '—'}</strong>
+              <strong>{profilesMap[o.player_id] || o.nama_guest || '—'}</strong>
               <div style={{ fontSize: 11, color: 'var(--muted)' }}>{o.keterangan} · Rp{o.nominal.toLocaleString('id-ID')}</div>
             </div>
             {isAdmin && (
@@ -199,12 +199,12 @@ export default function Kas() {
         <>
           <table style={{ marginBottom: 8 }}>
             <thead>
-              <tr><th>Waktu</th><th>Arah</th><th>Jumlah</th><th>Saldo Setelah</th></tr>
+              <tr><th>Tanggal</th><th>Arah</th><th>Jumlah</th><th>Saldo Setelah</th></tr>
             </thead>
             <tbody>
               {(showSemuaStok ? stokLog : stokLog.slice(0, 5)).map((s) => (
                 <tr key={s.id}>
-                  <td>{new Date(s.waktu).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}</td>
+                  <td>{new Date(s.waktu).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' })}</td>
                   <td style={{ color: s.arah === 'tambah' ? '#9ed6b0' : '#e8988c' }}>{s.arah}</td>
                   <td>{s.arah === 'tambah' ? '+' : '-'}{Math.abs(s.delta_piece)} piece ({s.slop} slop {s.piece} piece)</td>
                   <td>{Math.floor(s.saldo_setelah / 12)} slop {s.saldo_setelah % 12} piece</td>
@@ -226,8 +226,8 @@ export default function Kas() {
           <form className="card" onSubmit={tambahTransaksi}>
             <label>Jenis</label>
             <select value={form.jenis} onChange={(e) => setForm({ ...form, jenis: e.target.value })}>
-              <option value="pengeluaran">Pengeluaran</option>
-              <option value="pemasukan">Pemasukan</option>
+              <option value="pengeluaran">Kredit (pengeluaran)</option>
+              <option value="pemasukan">Debit (pemasukan)</option>
             </select>
             <label>Kategori</label>
             <select value={form.kategori} onChange={(e) => setForm({ ...form, kategori: e.target.value })}>
@@ -255,18 +255,17 @@ export default function Kas() {
       <h2>Riwayat Transaksi</h2>
       <table>
         <thead>
-          <tr><th>Tanggal</th><th>Jenis</th><th>Kategori</th><th>Nominal</th><th>Pemain</th><th>Keterangan</th></tr>
+          <tr><th>Tanggal</th><th>Jenis</th><th>Nominal</th><th>Pemain</th><th>Keterangan</th></tr>
         </thead>
         <tbody>
           {(showSemuaTransaksi ? transaksi : transaksi.slice(0, 5)).map((t) => (
             <tr key={t.id}>
               <td>{new Date(t.tanggal).toLocaleDateString('id-ID')}</td>
-              <td>{t.jenis}</td>
-              <td>{t.kategori || '-'}</td>
+              <td>{t.jenis === 'pemasukan' ? 'Debit' : 'Kredit'}</td>
               <td style={{ color: t.jenis === 'pemasukan' ? '#9ed6b0' : '#e8988c' }}>
                 {t.jenis === 'pemasukan' ? '+' : '-'}Rp{t.nominal.toLocaleString('id-ID')}
               </td>
-              <td>{t.player_id ? (profilesMap[t.player_id] || '-') : '-'}</td>
+              <td>{t.player_id ? (profilesMap[t.player_id] || '-') : (t.nama_guest || '-')}</td>
               <td>{t.keterangan || '-'}</td>
             </tr>
           ))}
