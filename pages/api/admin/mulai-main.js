@@ -23,6 +23,18 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `Lapangan ${lapangan} masih dipakai. Selesaikan dulu game yang lagi jalan.` });
   }
 
+  // Cegah data nyangkut: tolak kalau ada yang dipilih ternyata UDAH 'main' di lapangan lain
+  // (misal admin gak sengaja pilih orang yang sama di 2 kartu lapangan berbeda).
+  const { data: bentrok } = await supabaseAdmin
+    .from('pendaftaran_sesi')
+    .select('id')
+    .in('id', pendaftaran_ids)
+    .eq('status_main', 'main');
+
+  if (bentrok && bentrok.length > 0) {
+    return res.status(400).json({ error: 'Ada pemain yang dipilih ternyata sudah main di lapangan lain. Refresh halaman dan coba lagi.' });
+  }
+
   const { data: gameBaru, error: gameError } = await supabaseAdmin
     .from('game')
     .insert({ sesi_id, lapangan, input_by: profile.id })
