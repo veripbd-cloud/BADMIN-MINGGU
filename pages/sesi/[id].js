@@ -154,6 +154,13 @@ export default function DetailSesi() {
     load();
   }
 
+  async function batalMain(kodeLapangan) {
+    if (!confirm('Batalkan? Pemain balik ke posisi antrian semula, jumlah main mereka TIDAK nambah.')) return;
+    setMsg('');
+    await apiCall('/api/admin/batal-main', { sesi_id: id, lapangan: kodeLapangan });
+    load();
+  }
+
   if (loading || !sesi) return null;
 
   const sesiBerakhir = new Date() > new Date(sesi.tanggal + 'T10:00:00+07:00');
@@ -218,6 +225,16 @@ export default function DetailSesi() {
             {DAFTAR_LAPANGAN.map((kode) => {
               const pemain = pemainDiLapangan(kode);
               const kosong = pemain.length === 0;
+
+              // Orang yang udah kepilih di kartu lapangan LAIN gak ditampilin di sini,
+              // biar gak ke-double-pilih di 2 lapangan sekaligus.
+              const terpilihDiLapanganLain = new Set(
+                Object.entries(pilihanPerLapangan)
+                  .filter(([k]) => k !== kode)
+                  .flatMap(([, ids]) => ids)
+              );
+              const antrianBuatKartuIni = antrianMenunggu.filter((p) => !terpilihDiLapanganLain.has(p.id));
+
               return (
                 <div className="card" key={kode}>
                   <div className="card-row" style={{ marginBottom: 8 }}>
@@ -234,7 +251,10 @@ export default function DetailSesi() {
                           </div>
                         ))}
                       </div>
-                      <button disabled={!bisaAdminKontrol} onClick={() => selesaiMain(kode)}>Selesai Main</button>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button disabled={!bisaAdminKontrol} onClick={() => selesaiMain(kode)}>Selesai Main</button>
+                        <button className="secondary" disabled={!bisaAdminKontrol} onClick={() => batalMain(kode)}>Batal</button>
+                      </div>
                     </>
                   )}
 
@@ -242,8 +262,8 @@ export default function DetailSesi() {
                     <>
                       <p className="subtle" style={{ fontSize: 12, margin: '0 0 6px' }}>Pilih dari antrian:</p>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                        {antrianMenunggu.length === 0 && <span className="subtle" style={{ fontSize: 13 }}>Antrian kosong.</span>}
-                        {antrianMenunggu.map((p) => {
+                        {antrianBuatKartuIni.length === 0 && <span className="subtle" style={{ fontSize: 13 }}>Antrian kosong.</span>}
+                        {antrianBuatKartuIni.map((p) => {
                           const terpilih = (pilihanPerLapangan[kode] || []).includes(p.id);
                           return (
                             <button
