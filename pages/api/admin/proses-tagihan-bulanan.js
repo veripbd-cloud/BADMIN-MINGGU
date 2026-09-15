@@ -1,38 +1,46 @@
 import { supabaseAdmin, getProfileFromRequest, isAdmin } from '../../../lib/supabaseAdmin';
 
-// Hitung berapa bulan berturut-turut SEBELUM (bulan, tahun) yang sudah lunas
-// tanpa putus, DAN belum "dipakai" untuk siklus subsidi sebelumnya.
-// Pendekatan: mundur bulan demi bulan dari (bulan-1, tahun) selama statusnya 'lunas'.
-// Kalau ketemu bulan yang tier_subsidi-nya sudah 'diskon_50' atau 'gratis_100',
-// berhenti di situ (siklus baru dimulai SETELAH bulan subsidi terakhir).
-async function hitungBulanBerturutLunas(player_id, bulan, tahun) {
-  let count = 0;
-  let m = bulan - 1;
-  let y = tahun;
-
-  for (let i = 0; i < 24; i++) { // batas aman 24 bulan ke belakang
-    if (m === 0) { m = 12; y -= 1; }
-
-    const { data: tagihan } = await supabaseAdmin
-      .from('tagihan_bulanan')
-      .select('*')
-      .eq('player_id', player_id)
-      .eq('bulan', m)
-      .eq('tahun', y)
-      .maybeSingle();
-
-    if (!tagihan || tagihan.status_bayar !== 'lunas') break;
-
-    count += 1;
-
-    if (tagihan.tier_subsidi === 'diskon_50' || tagihan.tier_subsidi === 'gratis_100') {
-      break; // siklus reset setelah bulan yang sudah kena subsidi
-    }
-
-    m -= 1;
+// Kuartal TETAP dimulai Oktober: Okt-Nov-Des, Jan-Feb-Mar, Apr-Mei-Jun, Jul-Agu-Sep.
+// Return: { months: [{bulan,tahun} x3], isLastMonth: bool } — subsidi cuma dihitung
+// di bulan TERAKHIR tiap kuartal (Des, Mar, Jun, Sep).
+function getQuarterInfo(bulan, tahun) {
+  const idxDariOkt = (bulan - 10 + 12) % 12; // Okt=0, Nov=1, ..., Sep=11
+  const posDiKuartal = idxDariOkt % 3; // 0,1,2 -> posisi bulan ini di kuartalnya
+  const months = [];
+  for (let i = -posDiKuartal; i <= (2 - posDiKuartal); i++) {
+    let m = bulan + i;
+    let y = tahun;
+    while (m > 12) { m -= 12; y += 1; }
+    while (m < 1) { m += 12; y -= 1; }
+    months.push({ bulan: m, tahun: y });
   }
+  return { months, isLastMonth: posDiKuartal === 2 };
+}
 
-  return count;
+// Eligible subsidi kalau: ini bulan TERAKHIR kuartal, DAN member itu "terdaftar" (gak batal)
+// di sesi konfirmasi member bulanan buat KETIGA bulan di kuartal itu.
+async function cekEligibleQuarter(player_id, bulan, tahun) {
+  const { months, isLastMonth } = getQuarterInfo(bulan, tahun);
+  if (!isLastMonth) return false;
+
+  for (const m of months) {
+    const { data: sesiBulan } = await supabaseAdmin
+      .from('sesi_member_bulanan')
+      .select('id')
+      .eq('bulan', m.bulan)
+      .eq('tahun', m.tahun)
+      .maybeSingle();
+    if (!sesiBulan) return false; // sesi konfirmasi bulan itu belum pernah dibuka
+
+    const { data: pendaftaran } = await supabaseAdmin
+      .from('pendaftaran_member_bulanan')
+      .select('status_daftar')
+      .eq('sesi_member_bulanan_id', sesiBulan.id)
+      .eq('player_id', player_id)
+      .maybeSingle();
+    if (!pendaftaran || pendaftaran.status_daftar !== 'terdaftar') return false;
+  }
+  return true;
 }
 
 export default async function handler(req, res) {
@@ -68,10 +76,8 @@ export default async function handler(req, res) {
   const tidakEligibleList = [];
 
   for (const m of members || []) {
-    const bulanBerturut = await hitungBulanBerturutLunas(m.id, bulan, tahun);
-    // Eligible kalau sudah genap 2 bulan berturut lunas sebelum bulan ini
-    // (artinya bulan ini adalah bulan ke-3 dalam siklus)
-    if (bulanBerturut >= 2) {
+    const eligible = await cekEligibleQuarter(m.id, bulan, tahun);
+    if (eligible) {
       eligibleList.push(m);
     } else {
       tidakEligibleList.push(m);

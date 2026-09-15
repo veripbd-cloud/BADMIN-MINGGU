@@ -47,5 +47,30 @@ export default async function handler(req, res) {
     input_by: profile.id,
   });
 
+  // Kalau ini pelunasan iuran member bulanan DAN orangnya masih tercatat "harian" di
+  // profil, otomatis upgrade jadi "member" + set tanggal_daftar ke awal bulan itu
+  // (biar "Member sejak" di profil dia nunjukin sejak bulan dia beneran mulai jadi member).
+  if (outstanding.sumber === 'tagihan_bulanan_member' && outstanding.player_id) {
+    const { data: pendaftaranMember } = await supabaseAdmin
+      .from('pendaftaran_member_bulanan')
+      .select('*, sesi:sesi_member_bulanan_id(bulan, tahun)')
+      .eq('id', outstanding.referensi_id)
+      .maybeSingle();
+
+    if (pendaftaranMember?.sesi) {
+      const { data: prof } = await supabaseAdmin
+        .from('profiles').select('tipe').eq('id', outstanding.player_id).single();
+
+      if (prof && prof.tipe === 'harian') {
+        const { bulan, tahun } = pendaftaranMember.sesi;
+        const tanggalMulai = `${tahun}-${String(bulan).padStart(2, '0')}-01`;
+        await supabaseAdmin
+          .from('profiles')
+          .update({ tipe: 'member', tanggal_daftar: tanggalMulai })
+          .eq('id', outstanding.player_id);
+      }
+    }
+  }
+
   return res.status(200).json({ ok: true });
 }
