@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
+
+const NAMA_BULAN = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 function formatRibuan(v) {
   const angka = String(v || '').replace(/\D/g, '');
@@ -23,6 +26,8 @@ export default function AdminPage() {
   const [sesiForm, setSesiForm] = useState({ tanggal: '', label: '' });
   const [subsidiForm, setSubsidiForm] = useState({ bulan: new Date().getMonth() + 1, tahun: new Date().getFullYear(), biaya_bola: '' });
   const [hasilSubsidi, setHasilSubsidi] = useState(null);
+  const [memberBulananForm, setMemberBulananForm] = useState({ bulan: new Date().getMonth() + 1, tahun: new Date().getFullYear(), label: '' });
+  const [sesiMemberList, setSesiMemberList] = useState([]);
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
@@ -37,6 +42,14 @@ export default function AdminPage() {
 
     const { data: pendingData } = await supabase.from('profiles').select('*').eq('status_approval', 'pending');
     setPending(pendingData || []);
+
+    const { data: smb } = await supabase
+      .from('sesi_member_bulanan')
+      .select('*')
+      .order('tahun', { ascending: false })
+      .order('bulan', { ascending: false })
+      .limit(6);
+    setSesiMemberList(smb || []);
   }
 
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
@@ -114,6 +127,21 @@ export default function AdminPage() {
     setHasilSubsidi(json);
   }
 
+  async function bukaSesiMember(e) {
+    e.preventDefault();
+    setMsg('');
+    const token = await getAccessToken();
+    const res = await fetch('/api/admin/buka-sesi-member', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(memberBulananForm),
+    });
+    const json = await res.json();
+    if (!res.ok) { setMsg(json.error); return; }
+    setMsg('Sesi konfirmasi member bulanan dibuka.');
+    load();
+  }
+
   if (loading || !isAdmin) return null;
 
   return (
@@ -164,6 +192,36 @@ export default function AdminPage() {
         <div className="form-actions"><button type="submit">Buat Sesi</button></div>
       </form>
 
+      <h2>Konfirmasi Member Bulanan</h2>
+      <p className="subtle" style={{ fontSize: 11 }}>
+        Buka sekali tiap bulan buat konfirmasi siapa aja yang lanjut/mau jadi member. Deadline daftar
+        otomatis: 2 hari sejak dibuka, jam 23:59 WIB. Member yang gak daftar sampai deadline otomatis
+        diturunkan jadi harian. Harian yang daftar & bayar lunas otomatis naik jadi member.
+      </p>
+      <form className="card" onSubmit={bukaSesiMember}>
+        <label>Bulan (1-12)</label>
+        <input type="number" min="1" max="12" value={memberBulananForm.bulan} onChange={(e) => setMemberBulananForm({ ...memberBulananForm, bulan: e.target.value })} />
+        <label>Tahun</label>
+        <input type="number" value={memberBulananForm.tahun} onChange={(e) => setMemberBulananForm({ ...memberBulananForm, tahun: e.target.value })} />
+        <label>Label (opsional)</label>
+        <input placeholder="misal: Oktober 2026" value={memberBulananForm.label} onChange={(e) => setMemberBulananForm({ ...memberBulananForm, label: e.target.value })} />
+        <div className="form-actions"><button type="submit">Buka Sesi</button></div>
+      </form>
+
+      {sesiMemberList.length > 0 && (
+        <div className="card">
+          <p className="subtle" style={{ fontSize: 11, margin: '0 0 8px' }}>Sesi terakhir:</p>
+          {sesiMemberList.map((s) => (
+            <div key={s.id} style={{ fontSize: 13, marginBottom: 6 }}>
+              <Link href={`/member-bulanan/${s.id}`} style={{ textDecoration: 'underline' }}>
+                {s.label || `${NAMA_BULAN[s.bulan]} ${s.tahun}`}
+              </Link>
+              <span className="subtle" style={{ fontSize: 11 }}> — deadline {new Date(s.deadline_daftar).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' })}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <h2>Pending Approval ({pending.length})</h2>
       <p className="subtle" style={{ fontSize: 11 }}>Akun baru gak bisa daftar sesi sampai di-approve di sini. Pilih level final buat langsung meng-approve.</p>
       {pending.length === 0 && <div className="empty">Tidak ada yang menunggu review.</div>}
@@ -189,9 +247,10 @@ export default function AdminPage() {
 
       <h2>Proses Tagihan & Subsidi Bulanan</h2>
       <p className="subtle">
-        Jalankan di akhir bulan setelah biaya bola sudah dibeli & dicatat. Sistem otomatis hitung
-        member mana yang eligible subsidi (3 bulan berturut lunas) dan tier-nya (50% / gratis),
-        berdasarkan sisa kas setelah dipotong bola & lapangan.
+        Jalankan di akhir bulan setelah biaya bola sudah dibeli & dicatat. Subsidi cuma dihitung di
+        bulan TERAKHIR tiap kuartal tetap (Desember, Maret, Juni, September) — eligible kalau member
+        itu "terdaftar" di Konfirmasi Member Bulanan buat KETIGA bulan di kuartal itu tanpa putus.
+        Tier-nya (50% / gratis) dihitung dari sisa kas setelah dipotong bola & lapangan.
       </p>
       <form className="card" onSubmit={prosesSubsidi}>
         <label>Bulan (1-12)</label>
