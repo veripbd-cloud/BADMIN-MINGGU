@@ -19,6 +19,11 @@ export default function TopBar({ profile }) {
         <Link href="/" className={router.pathname === '/' ? 'active' : ''}>
           Sesi
         </Link>
+        {profile && (
+          <Link href="/member-bulanan" className={router.pathname.startsWith('/member-bulanan') ? 'active' : ''}>
+            Member
+          </Link>
+        )}
         {profile && (profile.tipe === 'member' || profile.role === 'admin' || profile.role === 'super_admin') && (
           <Link href="/kas" className={router.pathname === '/kas' ? 'active' : ''}>
             Kas
