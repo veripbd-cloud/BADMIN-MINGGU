@@ -176,18 +176,24 @@ export default function Kas() {
             <label>Arah</label>
             <select value={stokForm.arah} onChange={(e) => setStokForm({ ...stokForm, arah: e.target.value })}>
               <option value="tambah">Tambah stok (beli baru)</option>
-              <option value="kurangi">Kurangi stok (terpakai main)</option>
+              <option value="set_sisa">Set sisa stok (hitung real, sistem yang hitung terpakai)</option>
             </select>
             <div style={{ display: 'flex', gap: 10 }}>
               <div style={{ flex: 1 }}>
-                <label>Slop (1 slop = 12 piece)</label>
+                <label>{stokForm.arah === 'set_sisa' ? 'Sisa sekarang — Slop' : 'Slop yang dibeli (1 slop = 12 piece)'}</label>
                 <input type="number" min="0" value={stokForm.slop} onChange={(e) => setStokForm({ ...stokForm, slop: e.target.value })} />
               </div>
               <div style={{ flex: 1 }}>
-                <label>Piece (satuan)</label>
+                <label>{stokForm.arah === 'set_sisa' ? 'Sisa sekarang — Piece' : 'Piece yang dibeli'}</label>
                 <input type="number" min="0" value={stokForm.piece} onChange={(e) => setStokForm({ ...stokForm, piece: e.target.value })} />
               </div>
             </div>
+            {stokForm.arah === 'set_sisa' && (
+              <p className="subtle" style={{ fontSize: 11, marginTop: 6 }}>
+                Isi TOTAL sisa yang beneran ada sekarang (hasil hitung fisik), bukan berapa yang kepake.
+                Sistem otomatis hitung selisihnya sebagai "terpakai".
+              </p>
+            )}
             <div className="form-actions">
               <button type="submit">Update Stok</button>
             </div>
