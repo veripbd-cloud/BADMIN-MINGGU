@@ -148,6 +148,9 @@ export default function AdminPage() {
     <div className="wrap">
       <TopBar profile={profile} />
       <h1>Admin</h1>
+      <p className="subtle" style={{ marginBottom: 16 }}>
+        <Link href="/admin/users" style={{ textDecoration: 'underline' }}>Kelola User (nama, email, password, status, level)</Link>
+      </p>
       {msg && <p className="success">{msg}</p>}
 
       <h2>Pengaturan Harga & Kuota</h2>
