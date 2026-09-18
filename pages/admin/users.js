@@ -111,18 +111,16 @@ export default function KelolaUser() {
                   <label>Level Pengajuan</label>
                   <select value={form.level_self} onChange={(e) => setForm({ ...form, level_self: e.target.value })}>
                     <option value="">-</option>
-                    <option value="A1">A1</option><option value="A2">A2</option>
-                    <option value="B1">B1</option><option value="B2">B2</option>
-                    <option value="C">C</option>
+                    <option value="Bisa Jump Smash">Bisa Jump Smash</option>
+                    <option value="Tidak Bisa Jump Smash">Tidak Bisa Jump Smash</option>
                   </select>
                 </div>
                 <div style={{ flex: 1 }}>
                   <label>Level Final</label>
                   <select value={form.level_final} onChange={(e) => setForm({ ...form, level_final: e.target.value })}>
                     <option value="">-</option>
-                    <option value="A1">A1</option><option value="A2">A2</option>
-                    <option value="B1">B1</option><option value="B2">B2</option>
-                    <option value="C">C</option>
+                    <option value="Bisa Jump Smash">Bisa Jump Smash</option>
+                    <option value="Tidak Bisa Jump Smash">Tidak Bisa Jump Smash</option>
                   </select>
                 </div>
               </div>

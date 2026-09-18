@@ -238,11 +238,8 @@ export default function AdminPage() {
               </div>
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button className="secondary" onClick={() => approveLevel(p.id, 'A1')}>A1</button>
-              <button className="secondary" onClick={() => approveLevel(p.id, 'A2')}>A2</button>
-              <button className="secondary" onClick={() => approveLevel(p.id, 'B1')}>B1</button>
-              <button className="secondary" onClick={() => approveLevel(p.id, 'B2')}>B2</button>
-              <button className="secondary" onClick={() => approveLevel(p.id, 'C')}>C</button>
+              <button className="secondary" onClick={() => approveLevel(p.id, 'Bisa Jump Smash')}>Bisa Jump Smash</button>
+              <button className="secondary" onClick={() => approveLevel(p.id, 'Tidak Bisa Jump Smash')}>Tidak Bisa Jump Smash</button>
             </div>
           </div>
         </div>
