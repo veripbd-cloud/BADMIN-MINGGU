@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabaseClient';
 export default function Register() {
   const router = useRouter();
   const [form, setForm] = useState({
-    nama: '', email: '', password: '', tipe: 'harian', level_self: 'A1',
+    nama: '', email: '', password: '', tipe: 'harian', level_self: 'Bisa Jump Smash',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -78,11 +78,8 @@ export default function Register() {
 
         <label>Level (perkiraan sendiri)</label>
         <select value={form.level_self} onChange={(e) => update('level_self', e.target.value)}>
-          <option value="A1">A1</option>
-          <option value="A2">A2</option>
-          <option value="B1">B1</option>
-          <option value="B2">B2</option>
-          <option value="C">C</option>
+          <option value="Bisa Jump Smash">Bisa Jump Smash</option>
+          <option value="Tidak Bisa Jump Smash">Tidak Bisa Jump Smash</option>
         </select>
 
         {error && <p className="error">{error}</p>}

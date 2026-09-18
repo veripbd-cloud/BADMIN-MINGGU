@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../lib/useAuth';
 import TopBar from '../components/TopBar';
@@ -22,9 +23,23 @@ export default function Profile() {
   const [simpanMsg, setSimpanMsg] = useState('');
   const [menyimpan, setMenyimpan] = useState(false);
 
+  const [emailTampil, setEmailTampil] = useState('');
+  const [modeEditEmail, setModeEditEmail] = useState(false);
+  const [emailBaru, setEmailBaru] = useState('');
+  const [simpanEmailMsg, setSimpanEmailMsg] = useState('');
+  const [menyimpanEmail, setMenyimpanEmail] = useState(false);
+
   useEffect(() => {
     if (profile) setNamaTampil(profile.nama);
   }, [profile]);
+
+  useEffect(() => {
+    async function ambilEmail() {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user?.email) setEmailTampil(data.user.email);
+    }
+    ambilEmail();
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -65,6 +80,22 @@ export default function Profile() {
     setModeEdit(false);
   }
 
+  async function simpanEmail(e) {
+    e.preventDefault();
+    if (!emailBaru.trim()) return;
+    setMenyimpanEmail(true);
+    setSimpanEmailMsg('');
+    const { error } = await supabase.auth.updateUser({ email: emailBaru.trim() });
+    setMenyimpanEmail(false);
+    if (error) {
+      setSimpanEmailMsg('Gagal ganti email: ' + error.message);
+      return;
+    }
+    setSimpanEmailMsg('Berhasil. Kalau ada minta konfirmasi lewat email, cek inbox kamu dulu.');
+    setEmailTampil(emailBaru.trim());
+    setModeEditEmail(false);
+  }
+
   if (loading || !profile) return null;
 
   return (
@@ -96,6 +127,35 @@ export default function Profile() {
       )}
       {simpanMsg && <p className="error">{simpanMsg}</p>}
       <p className="subtle">{hitungTenure(profile)}</p>
+
+      {modeEditEmail ? (
+        <form onSubmit={simpanEmail} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 8 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ marginTop: 0 }}>Email</label>
+            <input type="email" value={emailBaru} onChange={(e) => setEmailBaru(e.target.value)} autoFocus />
+          </div>
+          <button type="submit" disabled={menyimpanEmail}>{menyimpanEmail ? '...' : 'Simpan'}</button>
+          <button type="button" className="secondary" onClick={() => setModeEditEmail(false)}>Batal</button>
+        </form>
+      ) : (
+        <div className="card-row" style={{ marginBottom: 8 }}>
+          <span className="subtle" style={{ fontSize: 12 }}>{emailTampil}</span>
+          <button
+            className="secondary"
+            onClick={() => { setEmailBaru(emailTampil); setModeEditEmail(true); setSimpanEmailMsg(''); }}
+            aria-label="Ganti email"
+            title="Ganti email"
+            style={{ padding: '4px 8px', fontSize: 12, lineHeight: 1 }}
+          >
+            ✏️
+          </button>
+        </div>
+      )}
+      {simpanEmailMsg && <p className={simpanEmailMsg.startsWith('Gagal') ? 'error' : 'success'}>{simpanEmailMsg}</p>}
+
+      <p className="subtle" style={{ fontSize: 12, marginBottom: 20 }}>
+        <Link href="/reset-password" style={{ textDecoration: 'underline' }}>Ganti Password</Link>
+      </p>
 
       <div className="stat">
         <div className="item">
