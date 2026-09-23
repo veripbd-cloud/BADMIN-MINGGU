@@ -34,7 +34,10 @@ export default function Kas() {
     const { data: o } = await supabase.from('outstanding').select('*').eq('status', 'belum_lunas');
     setOutstanding(o || []);
 
-    const idsOutstanding = (o || []).map((x) => x.player_id);
+    // PENTING: .filter(Boolean) di sini — outstanding milik GUEST punya player_id = null.
+    // Kalau null itu ikut masuk ke query .in('id', ids), SELURUH query pencarian nama
+    // ikut gagal (bukan cuma guest doang), makanya harian juga sempat kebaca "-".
+    const idsOutstanding = (o || []).map((x) => x.player_id).filter(Boolean);
     const idsTransaksi = (t || []).map((x) => x.player_id).filter(Boolean);
     const ids = [...new Set([...idsOutstanding, ...idsTransaksi])];
     if (ids.length) {
