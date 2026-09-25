@@ -10,6 +10,19 @@ function namaPeserta(p, profiles) {
   return profiles[p.player_id]?.nama || p.nama_guest || 'Guest';
 }
 
+// Header section yang bisa di-collapse, segitiga solid nyesuain ukuran teks
+function HeaderCollapse({ children, terbuka, onToggle }) {
+  return (
+    <div
+      onClick={onToggle}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}
+    >
+      <h2 style={{ margin: 0 }}>{children}</h2>
+      <span style={{ fontSize: 12, lineHeight: 1 }}>{terbuka ? '▲' : '▼'}</span>
+    </div>
+  );
+}
+
 export default function DetailSesi() {
   const router = useRouter();
   const { id } = router.query;
@@ -21,6 +34,11 @@ export default function DetailSesi() {
   const [namaGuestBaru, setNamaGuestBaru] = useState('');
   const [msg, setMsg] = useState('');
 
+  const [bukaMember, setBukaMember] = useState(true);
+  const [bukaHarian, setBukaHarian] = useState(true);
+  const [bukaGuest, setBukaGuest] = useState(true);
+  const [bukaAntrian, setBukaAntrian] = useState(true);
+
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
   async function load() {
@@ -28,8 +46,6 @@ export default function DetailSesi() {
     const { data: sesiData } = await supabase.from('sesi').select('*').eq('id', id).single();
     setSesi(sesiData);
 
-    // Kalau sesi udah lewat jam 10:00 dan yang buka ini admin, otomatis tandai no-show
-    // buat harian/guest yang gak pernah diklik hadir sama sekali. Aman dipanggil berkali-kali.
     if (sesiData && isAdmin) {
       const sudahLewat = new Date() > new Date(sesiData.tanggal + 'T10:00:00+07:00');
       if (sudahLewat) {
@@ -68,8 +84,6 @@ export default function DetailSesi() {
   const waitingHarian = pendaftaran.filter((p) => p.status_daftar === 'waiting_list' && p.tipe_slot === 'harian');
   const semuaTerdaftar = [...terdaftarMember, ...terdaftarHarian, ...terdaftarGuest];
 
-  // FIFO murni: siapa check-in paling duluan, main paling duluan — gak peduli udah
-  // main berapa kali. jumlah_game cuma buat info tampilan, gak dipakai buat urutan.
   const antrianMenunggu = semuaTerdaftar
     .filter((p) => p.waktu_checkin && p.status_main !== 'main')
     .sort((a, b) => new Date(a.waktu_checkin) - new Date(b.waktu_checkin));
@@ -100,12 +114,6 @@ export default function DetailSesi() {
   async function hadirGabungan(pendaftaran_id) {
     await apiCall('/api/admin/checkin', { pendaftaran_id });
     await apiCall('/api/admin/tandai-hadir', { pendaftaran_id, status_hadir: 'hadir' });
-    load();
-  }
-
-  async function ralatHadir(pendaftaran_id) {
-    if (!confirm('Ralat status hadir/tidak-hadir ini? Outstanding yang belum dibayar (kalau ada) akan ikut dihapus.')) return;
-    await apiCall('/api/admin/ralat-hadir', { pendaftaran_id });
     load();
   }
 
@@ -165,26 +173,43 @@ export default function DetailSesi() {
 
   const sesiBerakhir = new Date() > new Date(sesi.tanggal + 'T10:00:00+07:00');
   const bisaAdminKontrol = isAdmin && !sesiBerakhir;
+  const totalHarianGuest = terdaftarHarian.length + terdaftarGuest.length;
 
   return (
     <div className="wrap">
       <TopBar profile={profile} />
       <h1>{sesi.label || sesi.tanggal}</h1>
       <p className="subtle">
-        Deadline batal: {new Date(sesi.deadline_batal).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB · Kuota: {sesi.kuota_member} member / {sesi.kuota_harian} harian / {terdaftarGuest.length} guest
+        Deadline batal: {new Date(sesi.deadline_batal).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB
+        {' · '}Terdaftar: {terdaftarMember.length} member / {totalHarianGuest} harian & guest
+        <span style={{ fontSize: 10 }}> (maks 30 org, guest di luar itu)</span>
       </p>
       {sesiBerakhir && <p className="badge done" style={{ display: 'inline-block', marginBottom: 10 }}>Sesi sudah berakhir (lewat jam 10:00) — kontrol admin dikunci</p>}
       {msg && <p className="error">{msg}</p>}
 
-      <h2>Terdaftar — Member ({terdaftarMember.length}/{sesi.kuota_member})</h2>
-      <ListPeserta items={terdaftarMember} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} onRalat={ralatHadir} />
+      <HeaderCollapse terbuka={bukaMember} onToggle={() => setBukaMember(!bukaMember)}>
+        Terdaftar — Member ({terdaftarMember.length}/{sesi.kuota_member})
+      </HeaderCollapse>
+      {bukaMember && (
+        <ListPeserta items={terdaftarMember} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} />
+      )}
 
-      <h2>Terdaftar — Harian ({terdaftarHarian.length}/{sesi.kuota_harian})</h2>
-      <ListPeserta items={terdaftarHarian} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} onRalat={ralatHadir} />
+      <HeaderCollapse terbuka={bukaHarian} onToggle={() => setBukaHarian(!bukaHarian)}>
+        Terdaftar — Harian ({terdaftarHarian.length}/{sesi.kuota_harian})
+      </HeaderCollapse>
+      {bukaHarian && (
+        <ListPeserta items={terdaftarHarian} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} />
+      )}
 
-      <h2>Guest ({terdaftarGuest.length})</h2>
-      <p className="subtle" style={{ fontSize: 11 }}>Pemain dadakan yang ditambahkan langsung oleh admin, tanpa perlu akun. Ikut kena tagihan sama seperti harian saat ditandai Hadir.</p>
-      <ListPeserta items={terdaftarGuest} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} onRalat={ralatHadir} />
+      <HeaderCollapse terbuka={bukaGuest} onToggle={() => setBukaGuest(!bukaGuest)}>
+        Guest ({terdaftarGuest.length})
+      </HeaderCollapse>
+      {bukaGuest && (
+        <>
+          <p className="subtle" style={{ fontSize: 11 }}>Pemain dadakan yang ditambahkan langsung oleh admin, tanpa perlu akun. Ikut kena tagihan sama seperti harian saat ditandai Hadir.</p>
+          <ListPeserta items={terdaftarGuest} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} />
+        </>
+      )}
       {isAdmin && (
         <form className="card" onSubmit={tambahGuest} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
           <div style={{ flex: 1 }}>
@@ -226,8 +251,6 @@ export default function DetailSesi() {
               const pemain = pemainDiLapangan(kode);
               const kosong = pemain.length === 0;
 
-              // Orang yang udah kepilih di kartu lapangan LAIN gak ditampilin di sini,
-              // biar gak ke-double-pilih di 2 lapangan sekaligus.
               const terpilihDiLapanganLain = new Set(
                 Object.entries(pilihanPerLapangan)
                   .filter(([k]) => k !== kode)
@@ -292,16 +315,22 @@ export default function DetailSesi() {
             })}
           </div>
 
-          <h2>Antrian Menunggu ({antrianMenunggu.length})</h2>
-          {antrianMenunggu.length === 0 && <div className="empty">Tidak ada yang sedang menunggu.</div>}
-          {antrianMenunggu.map((p, idx) => (
-            <div className="card" key={p.id}>
-              <div className="card-row">
-                <span>{idx + 1}. {namaPeserta(p, profiles)} — {p.jumlah_game}x main</span>
-                <span className="badge">sejak {new Date(p.waktu_checkin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })} WIB</span>
-              </div>
-            </div>
-          ))}
+          <HeaderCollapse terbuka={bukaAntrian} onToggle={() => setBukaAntrian(!bukaAntrian)}>
+            Antrian Menunggu ({antrianMenunggu.length})
+          </HeaderCollapse>
+          {bukaAntrian && (
+            <>
+              {antrianMenunggu.length === 0 && <div className="empty">Tidak ada yang sedang menunggu.</div>}
+              {antrianMenunggu.map((p, idx) => (
+                <div className="card" key={p.id}>
+                  <div className="card-row">
+                    <span>{idx + 1}. {namaPeserta(p, profiles)} — {p.jumlah_game}x main</span>
+                    <span className="badge">sejak {new Date(p.waktu_checkin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' })} WIB</span>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
 
           {belumCheckin.length > 0 && (
             <>
@@ -322,7 +351,7 @@ export default function DetailSesi() {
   );
 }
 
-function ListPeserta({ items, profiles, isAdmin, onHadir, onTandai, onBatalkan, onRalat }) {
+function ListPeserta({ items, profiles, isAdmin, onHadir, onTandai, onBatalkan }) {
   if (items.length === 0) return <div className="empty">Belum ada.</div>;
   return items.map((p) => {
     return (
@@ -339,13 +368,11 @@ function ListPeserta({ items, profiles, isAdmin, onHadir, onTandai, onBatalkan, 
           </div>
           {isAdmin && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              {!p.status_hadir ? (
+              {!p.status_hadir && (
                 <>
                   <button className="secondary" onClick={() => onHadir(p.id)}>Hadir</button>
                   <button className="danger" onClick={() => onTandai(p.id, 'no_show')}>Tidak Hadir</button>
                 </>
-              ) : (
-                <button className="secondary" onClick={() => onRalat(p.id)}>Ralat</button>
               )}
               <button className="danger" onClick={() => onBatalkan(p.id)}>Cancel</button>
             </div>
