@@ -34,10 +34,10 @@ export default function DetailSesi() {
   const [namaGuestBaru, setNamaGuestBaru] = useState('');
   const [msg, setMsg] = useState('');
 
-  const [bukaMember, setBukaMember] = useState(true);
-  const [bukaHarian, setBukaHarian] = useState(true);
-  const [bukaGuest, setBukaGuest] = useState(true);
-  const [bukaAntrian, setBukaAntrian] = useState(true);
+  const [bukaMember, setBukaMember] = useState(false);
+  const [bukaHarian, setBukaHarian] = useState(false);
+  const [bukaGuest, setBukaGuest] = useState(false);
+  const [bukaAntrian, setBukaAntrian] = useState(false);
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
