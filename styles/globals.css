@@ -1,19 +1,16 @@
-/* ============================================================
-   Token desain: terinspirasi garis lapangan badminton & malam hari
-   di GOR — bukan palet SaaS generik.
-   ============================================================ */
 :root {
-  --court-green: #1b3a2f;      /* hijau lapangan sintetis */
+  --court-green: #1b3a2f;
   --court-green-dark: #10261d;
-  --line-white: #f4f7f2;       /* garis lapangan */
-  --shuttle-yellow: #e8b64c;   /* aksen kok/shuttle */
-  --clay-red: #b5493a;         /* aksen peringatan/outstanding */
+  --line-white: #f4f7f2;
+  --shuttle-yellow: #e8b64c;
+  --clay-red: #b5493a;
   --ink: #0d1a15;
   --muted: #9fb3aa;
   --card-bg: #16302691;
   --radius: 10px;
   --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Helvetica, Arial, sans-serif;
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Helvetica, Arial, sans-serif;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 * { box-sizing: border-box; }
@@ -30,10 +27,21 @@ html, body {
 
 a { color: inherit; }
 
+/* ---------- Animasi halus (sengaja pelan & kecil biar kesannya rapi, bukan heboh) ---------- */
+@keyframes naikPelan {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes munculPelan {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 .wrap {
   max-width: 780px;
   margin: 0 auto;
   padding: 24px 20px 80px;
+  animation: munculPelan 0.35s var(--ease) both;
 }
 
 .topbar {
@@ -51,42 +59,26 @@ a { color: inherit; }
   font-size: 14px;
   letter-spacing: 0.2px;
 }
-
 .brand .accent { color: var(--shuttle-yellow); }
 
-nav.tabs {
-  display: flex;
-  gap: 6px;
-}
-
+nav.tabs { display: flex; gap: 6px; }
 nav.tabs a {
   text-decoration: none;
   font-size: 11px;
   padding: 6px 12px;
   border-radius: 999px;
   color: var(--muted);
+  transition: color 0.2s var(--ease), background 0.2s var(--ease);
 }
-
+nav.tabs a:hover { color: var(--line-white); background: #ffffff10; }
 nav.tabs a.active {
   background: var(--shuttle-yellow);
   color: var(--ink);
   font-weight: 600;
 }
 
-h1 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 16px;
-  margin: 0 0 4px;
-}
-
-h2 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 12px;
-  margin: 28px 0 10px;
-  color: var(--line-white);
-}
+h1 { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 0 0 4px; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 12px; margin: 28px 0 10px; color: var(--line-white); }
 
 p.subtle { color: var(--muted); margin-top: 0; }
 
@@ -96,7 +88,10 @@ p.subtle { color: var(--muted); margin-top: 0; }
   border-radius: var(--radius);
   padding: 16px 18px;
   margin-bottom: 12px;
+  animation: naikPelan 0.4s var(--ease) both;
+  transition: border-color 0.25s var(--ease), background 0.25s var(--ease);
 }
+.card:hover { border-color: #ffffff30; }
 
 .card-row {
   display: flex;
@@ -113,7 +108,6 @@ p.subtle { color: var(--muted); margin-top: 0; }
   color: var(--muted);
   white-space: nowrap;
 }
-
 .badge.open { border-color: var(--shuttle-yellow); color: var(--shuttle-yellow); }
 .badge.warn { border-color: var(--clay-red); color: #e8988c; }
 .badge.done { border-color: #5f7d70; color: #7fa393; }
@@ -128,7 +122,9 @@ p.subtle { color: var(--muted); margin-top: 0; }
   color: var(--shuttle-yellow);
   cursor: pointer;
   font-family: var(--font-body);
+  transition: background 0.2s var(--ease), transform 0.15s var(--ease);
 }
+.badge-btn:hover:not(:disabled) { background: #e8b64c1f; }
 .badge-btn.danger-outline { border-color: var(--clay-red); color: #e8988c; }
 
 button, .btn {
@@ -141,23 +137,21 @@ button, .btn {
   cursor: pointer;
   background: var(--shuttle-yellow);
   color: var(--ink);
+  transition: transform 0.15s var(--ease), filter 0.2s var(--ease), background 0.2s var(--ease), border-color 0.2s var(--ease);
 }
+button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.07); }
+button:active:not(:disabled) { transform: translateY(0); filter: brightness(0.97); }
 
 button.secondary {
   background: transparent;
   border: 1px solid #ffffff44;
   color: var(--line-white);
 }
+button.secondary:hover:not(:disabled) { border-color: #ffffff77; background: #ffffff0d; filter: none; }
 
-button.danger {
-  background: var(--clay-red);
-  color: var(--line-white);
-}
+button.danger { background: var(--clay-red); color: var(--line-white); }
 
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 input, select, textarea {
   font-family: var(--font-body);
@@ -168,6 +162,12 @@ input, select, textarea {
   background: #0000002e;
   color: var(--line-white);
   width: 100%;
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #e8b64c99;
+  box-shadow: 0 0 0 3px #e8b64c1f;
 }
 
 label {
@@ -180,34 +180,13 @@ label {
 
 .form-actions { margin-top: 18px; }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 11px;
-}
-
-th, td {
-  text-align: left;
-  padding: 8px 6px;
-  border-bottom: 1px solid #ffffff1a;
-}
-
+table { width: 100%; border-collapse: collapse; font-size: 11px; }
+th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid #ffffff1a; }
 th { color: var(--muted); font-weight: 500; font-size: 12px; }
 
-.stat {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
+.stat { display: flex; gap: 24px; flex-wrap: wrap; }
 .stat .item { min-width: 120px; }
-.stat .num {
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 400;
-  display: block;
-  color: var(--line-white);
-}
+.stat .num { font-family: var(--font-body); font-size: 13px; font-weight: 400; display: block; color: var(--line-white); }
 .stat .label { font-size: 13px; font-weight: 700; color: var(--line-white); }
 
 .outstanding-item { border-left: 3px solid var(--clay-red); padding-left: 10px; }
@@ -215,9 +194,9 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .error { color: #e8988c; font-size: 11px; margin-top: 8px; }
 .success { color: #9ed6b0; font-size: 11px; margin-top: 8px; }
 
-.empty {
-  text-align: center;
-  color: var(--muted);
-  padding: 30px 0;
-  font-size: 11px;
+.empty { text-align: center; color: var(--muted); padding: 30px 0; font-size: 11px; }
+
+/* Hormati pengguna yang matiin animasi di perangkatnya */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }
