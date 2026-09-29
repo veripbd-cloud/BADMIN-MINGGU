@@ -7,6 +7,9 @@ import TopBar from '../../components/TopBar';
 
 const NAMA_BULAN = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
+const TEKS_SESI = 'Sesi main jam 07:00–10:00 di tanggal ini. Deadline batal otomatis: H-1 (sehari sebelumnya) jam 23:59 WIB (setelah itu batal harus lewat admin). Sesi otomatis dianggap selesai begitu lewat jam 10:00.';
+const TEKS_MEMBER = 'Buka sekali tiap bulan buat konfirmasi siapa aja yang lanjut/mau jadi member. Deadline daftar otomatis: 2 hari sejak dibuka, jam 23:59 WIB. Member yang gak daftar sampai deadline otomatis diturunkan jadi harian. Harian yang daftar & bayar lunas otomatis naik jadi member.';
+
 function formatRibuan(v) {
   const angka = String(v || '').replace(/\D/g, '');
   if (!angka) return '';
@@ -21,15 +24,23 @@ export default function AdminPage() {
   const router = useRouter();
   const { profile, loading } = useAuth();
   const [pengaturan, setPengaturan] = useState({});
+  const [pengaturanTerbuka, setPengaturanTerbuka] = useState(false);
   const [pending, setPending] = useState([]);
-  const [msg, setMsg] = useState('');
-  const [sesiForm, setSesiForm] = useState({ tanggal: '', label: '' });
-  const [subsidiForm, setSubsidiForm] = useState({ bulan: new Date().getMonth() + 1, tahun: new Date().getFullYear(), biaya_bola: '' });
-  const [hasilSubsidi, setHasilSubsidi] = useState(null);
-  const [memberBulananForm, setMemberBulananForm] = useState({ bulan: new Date().getMonth() + 1, tahun: new Date().getFullYear(), label: '' });
+  const [pesan, setPesan] = useState({ teks: '', error: false });
   const [sesiMemberList, setSesiMemberList] = useState([]);
 
+  // Form gabungan: Buat Sesi Baru / Konfirmasi Member Bulanan
+  const [buatJenis, setBuatJenis] = useState('');
+  const [buatForm, setBuatForm] = useState({ tanggal: '', bulanTahun: '', label: '' });
+
+  const [subsidiForm, setSubsidiForm] = useState({ bulan: new Date().getMonth() + 1, tahun: new Date().getFullYear(), biaya_bola: '' });
+  const [hasilSubsidi, setHasilSubsidi] = useState(null);
+
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
+
+  function tampilPesan(teks, error = false) {
+    setPesan({ teks, error });
+  }
 
   useEffect(() => {
     if (!loading && profile && !isAdmin) router.push('/');
@@ -57,16 +68,23 @@ export default function AdminPage() {
   async function simpanPengaturan(e) {
     e.preventDefault();
     const token = await getAccessToken();
-    await fetch('/api/admin/pengaturan', {
+    const res = await fetch('/api/admin/pengaturan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(pengaturan),
     });
-    setMsg('Pengaturan tersimpan.');
+    if (!res.ok) { tampilPesan('Gagal menyimpan pengaturan.', true); return; }
+    try {
+      localStorage.setItem('brand_badmin', JSON.stringify({
+        bagian1: pengaturan.brand_bagian1 ?? 'BADMIN',
+        bagian2: pengaturan.brand_bagian2 ?? 'MINGGU',
+      }));
+    } catch (err) { /* abaikan */ }
+    tampilPesan('Pengaturan tersimpan. Nama brand di navbar ikut berubah setelah halaman di-refresh.');
   }
 
   async function approveLevel(player_id, level_final) {
-    setMsg('');
+    tampilPesan('');
     const token = await getAccessToken();
     const res = await fetch('/api/admin/approve-level', {
       method: 'POST',
@@ -75,44 +93,58 @@ export default function AdminPage() {
     });
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
-      setMsg(`Gagal approve: ${json.error || 'terjadi kesalahan, coba lagi.'}`);
+      tampilPesan(`Gagal approve: ${json.error || 'terjadi kesalahan, coba lagi.'}`, true);
       return;
     }
-    setMsg(`Berhasil di-approve sebagai level ${level_final}.`);
+    tampilPesan(`Berhasil di-approve sebagai ${level_final}.`);
     load();
   }
 
-  async function buatSesi(e) {
+  async function submitBuat(e) {
     e.preventDefault();
-    setMsg('');
-    // Deadline batal = H-1 (sehari sebelum sesi) jam 23:59 WIB — sesuai pengaturan
-    // deadline_batal_hari/deadline_batal_jam. Dihitung pakai UTC math + offset eksplisit
-    // +07:00 (BUKAN setDate/setHours) biar gak gantung timezone device admin sama sekali.
-    const [y, m, d] = sesiForm.tanggal.split('-').map(Number);
-    const tanggalMinus1 = new Date(Date.UTC(y, m - 1, d));
-    tanggalMinus1.setUTCDate(tanggalMinus1.getUTCDate() - 1);
-    const yyyy = tanggalMinus1.getUTCFullYear();
-    const mm = String(tanggalMinus1.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(tanggalMinus1.getUTCDate()).padStart(2, '0');
-    const deadline = new Date(`${yyyy}-${mm}-${dd}T23:59:00+07:00`);
-
+    tampilPesan('');
     const token = await getAccessToken();
-    const res = await fetch('/api/admin/buat-sesi', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        tanggal: sesiForm.tanggal,
-        label: sesiForm.label,
-        kuota_total: pengaturan.kuota_total,
-        kuota_member: pengaturan.kuota_member,
-        kuota_harian: pengaturan.kuota_harian,
-        deadline_batal: deadline.toISOString(),
-      }),
-    });
-    const json = await res.json();
-    if (!res.ok) { setMsg(json.error); return; }
-    setMsg('Sesi baru dibuat.');
-    setSesiForm({ tanggal: '', label: '' });
+    const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+
+    if (buatJenis === 'sesi') {
+      // Deadline H-1 jam 23:59 WIB, dihitung pakai UTC math + offset +07:00 (gak gantung timezone device)
+      const [y, m, d] = buatForm.tanggal.split('-').map(Number);
+      const tanggalMinus1 = new Date(Date.UTC(y, m - 1, d));
+      tanggalMinus1.setUTCDate(tanggalMinus1.getUTCDate() - 1);
+      const yyyy = tanggalMinus1.getUTCFullYear();
+      const mm = String(tanggalMinus1.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(tanggalMinus1.getUTCDate()).padStart(2, '0');
+      const deadline = new Date(`${yyyy}-${mm}-${dd}T23:59:00+07:00`);
+
+      const res = await fetch('/api/admin/buat-sesi', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          tanggal: buatForm.tanggal,
+          label: buatForm.label,
+          kuota_total: pengaturan.kuota_total,
+          kuota_member: pengaturan.kuota_member,
+          kuota_harian: pengaturan.kuota_harian,
+          deadline_batal: deadline.toISOString(),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) { tampilPesan(json.error, true); return; }
+      tampilPesan('Sesi baru dibuat.');
+    } else if (buatJenis === 'member') {
+      const [tahun, bulan] = buatForm.bulanTahun.split('-').map(Number);
+      const res = await fetch('/api/admin/buka-sesi-member', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ bulan, tahun, label: buatForm.label }),
+      });
+      const json = await res.json();
+      if (!res.ok) { tampilPesan(json.error, true); return; }
+      tampilPesan('Sesi konfirmasi member bulanan dibuka.');
+    }
+
+    setBuatForm({ tanggal: '', bulanTahun: '', label: '' });
+    load();
   }
 
   async function prosesSubsidi(e) {
@@ -127,21 +159,6 @@ export default function AdminPage() {
     setHasilSubsidi(json);
   }
 
-  async function bukaSesiMember(e) {
-    e.preventDefault();
-    setMsg('');
-    const token = await getAccessToken();
-    const res = await fetch('/api/admin/buka-sesi-member', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(memberBulananForm),
-    });
-    const json = await res.json();
-    if (!res.ok) { setMsg(json.error); return; }
-    setMsg('Sesi konfirmasi member bulanan dibuka.');
-    load();
-  }
-
   if (loading || !isAdmin) return null;
 
   return (
@@ -151,69 +168,88 @@ export default function AdminPage() {
       <p className="subtle" style={{ marginBottom: 16 }}>
         <Link href="/admin/users" style={{ textDecoration: 'underline' }}>Kelola User (nama, email, password, status, level)</Link>
       </p>
-      {msg && <p className="success">{msg}</p>}
+      {pesan.teks && <p className={pesan.error ? 'error' : 'success'}>{pesan.teks}</p>}
 
-      <h2>Pengaturan Harga & Kuota</h2>
-      <form className="card" onSubmit={simpanPengaturan}>
-        <label>Harga harian (Rp)</label>
-        <input
-          value={formatRibuan(pengaturan.harga_harian)}
-          onChange={(e) => setPengaturan({ ...pengaturan, harga_harian: parseRibuan(e.target.value) })}
-        />
-        <label>Harga member bulanan (Rp)</label>
-        <input
-          value={formatRibuan(pengaturan.harga_member_bulanan)}
-          onChange={(e) => setPengaturan({ ...pengaturan, harga_member_bulanan: parseRibuan(e.target.value) })}
-        />
-        <label>Kuota member per sesi</label>
-        <input value={pengaturan.kuota_member || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_member: e.target.value })} />
-        <label>Kuota harian per sesi</label>
-        <input value={pengaturan.kuota_harian || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_harian: e.target.value })} />
-        <label>Kuota total per sesi</label>
-        <input value={pengaturan.kuota_total || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_total: e.target.value })} />
-        <label>Kuota guest per sesi (pemain dadakan tanpa akun)</label>
-        <input value={pengaturan.kuota_guest || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_guest: e.target.value })} />
-        <label>Biaya lapangan per bulan (Rp)</label>
-        <input
-          value={formatRibuan(pengaturan.biaya_lapangan_bulanan)}
-          onChange={(e) => setPengaturan({ ...pengaturan, biaya_lapangan_bulanan: parseRibuan(e.target.value) })}
-        />
-        <div className="form-actions"><button type="submit">Simpan Pengaturan</button></div>
-      </form>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div className="card-row" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => setPengaturanTerbuka(!pengaturanTerbuka)}>
+          <strong>Pengaturan Harga, Kuota & Nama Brand</strong>
+          <span style={{ fontSize: 12, lineHeight: 1 }}>{pengaturanTerbuka ? '▲' : '▼'}</span>
+        </div>
 
-      <h2>Buat Sesi Baru</h2>
-      <form className="card" onSubmit={buatSesi}>
-        <label>Tanggal sesi</label>
-        <input type="date" required value={sesiForm.tanggal} onChange={(e) => setSesiForm({ ...sesiForm, tanggal: e.target.value })} />
-        <label>Label (opsional)</label>
-        <input placeholder="misal: Week 5 - 12 September 2026" value={sesiForm.label} onChange={(e) => setSesiForm({ ...sesiForm, label: e.target.value })} />
-        <p className="subtle" style={{ fontSize: 11 }}>
-          Sesi main jam 07:00–10:00 di tanggal ini. Deadline batal otomatis: H-1 (sehari sebelumnya)
-          jam 23:59 WIB (setelah itu batal harus lewat admin). Sesi otomatis dianggap selesai begitu
-          lewat jam 10:00.
-        </p>
-        <div className="form-actions"><button type="submit">Buat Sesi</button></div>
-      </form>
+        {pengaturanTerbuka && (
+          <form onSubmit={simpanPengaturan} style={{ marginTop: 14 }}>
+            <label style={{ marginTop: 0 }}>Nama brand — bagian putih</label>
+            <input value={pengaturan.brand_bagian1 || ''} onChange={(e) => setPengaturan({ ...pengaturan, brand_bagian1: e.target.value })} />
+            <label>Nama brand — bagian oranye</label>
+            <input value={pengaturan.brand_bagian2 || ''} onChange={(e) => setPengaturan({ ...pengaturan, brand_bagian2: e.target.value })} />
 
-      <h2>Konfirmasi Member Bulanan</h2>
-      <p className="subtle" style={{ fontSize: 11 }}>
-        Buka sekali tiap bulan buat konfirmasi siapa aja yang lanjut/mau jadi member. Deadline daftar
-        otomatis: 2 hari sejak dibuka, jam 23:59 WIB. Member yang gak daftar sampai deadline otomatis
-        diturunkan jadi harian. Harian yang daftar & bayar lunas otomatis naik jadi member.
-      </p>
-      <form className="card" onSubmit={bukaSesiMember}>
-        <label>Bulan (1-12)</label>
-        <input type="number" min="1" max="12" value={memberBulananForm.bulan} onChange={(e) => setMemberBulananForm({ ...memberBulananForm, bulan: e.target.value })} />
-        <label>Tahun</label>
-        <input type="number" value={memberBulananForm.tahun} onChange={(e) => setMemberBulananForm({ ...memberBulananForm, tahun: e.target.value })} />
-        <label>Label (opsional)</label>
-        <input placeholder="misal: Oktober 2026" value={memberBulananForm.label} onChange={(e) => setMemberBulananForm({ ...memberBulananForm, label: e.target.value })} />
-        <div className="form-actions"><button type="submit">Buka Sesi</button></div>
+            <label>Harga harian (Rp)</label>
+            <input
+              value={formatRibuan(pengaturan.harga_harian)}
+              onChange={(e) => setPengaturan({ ...pengaturan, harga_harian: parseRibuan(e.target.value) })}
+            />
+            <label>Harga member bulanan (Rp)</label>
+            <input
+              value={formatRibuan(pengaturan.harga_member_bulanan)}
+              onChange={(e) => setPengaturan({ ...pengaturan, harga_member_bulanan: parseRibuan(e.target.value) })}
+            />
+            <label>Kuota member per sesi</label>
+            <input value={pengaturan.kuota_member || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_member: e.target.value })} />
+            <label>Kuota harian per sesi</label>
+            <input value={pengaturan.kuota_harian || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_harian: e.target.value })} />
+            <label>Kuota total per sesi</label>
+            <input value={pengaturan.kuota_total || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_total: e.target.value })} />
+            <label>Kuota guest per sesi (pemain dadakan tanpa akun)</label>
+            <input value={pengaturan.kuota_guest || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_guest: e.target.value })} />
+            <label>Biaya lapangan per bulan (Rp)</label>
+            <input
+              value={formatRibuan(pengaturan.biaya_lapangan_bulanan)}
+              onChange={(e) => setPengaturan({ ...pengaturan, biaya_lapangan_bulanan: parseRibuan(e.target.value) })}
+            />
+            <div className="form-actions"><button type="submit">Simpan Pengaturan</button></div>
+          </form>
+        )}
+      </div>
+
+      <h2>Buat Baru</h2>
+      <form className="card" onSubmit={submitBuat}>
+        <label style={{ marginTop: 0 }}>Jenis</label>
+        <select value={buatJenis} onChange={(e) => setBuatJenis(e.target.value)} required>
+          <option value="">Pilih jenis...</option>
+          <option value="sesi">Buat Sesi Baru</option>
+          <option value="member">Konfirmasi Member Bulanan</option>
+        </select>
+
+        {buatJenis === 'sesi' && (
+          <>
+            <label>Tanggal sesi</label>
+            <input type="date" required value={buatForm.tanggal} onChange={(e) => setBuatForm({ ...buatForm, tanggal: e.target.value })} />
+            <label>Label (opsional)</label>
+            <input placeholder="misal: Week 5 - 12 September 2026" value={buatForm.label} onChange={(e) => setBuatForm({ ...buatForm, label: e.target.value })} />
+            <p className="subtle" style={{ fontSize: 11, marginTop: 10, marginBottom: 0 }}>{TEKS_SESI}</p>
+          </>
+        )}
+
+        {buatJenis === 'member' && (
+          <>
+            <label>Bulan</label>
+            <input type="month" required placeholder="YYYY-MM" value={buatForm.bulanTahun} onChange={(e) => setBuatForm({ ...buatForm, bulanTahun: e.target.value })} />
+            <label>Label (opsional)</label>
+            <input placeholder="misal: Oktober 2026" value={buatForm.label} onChange={(e) => setBuatForm({ ...buatForm, label: e.target.value })} />
+            <p className="subtle" style={{ fontSize: 11, marginTop: 10, marginBottom: 0 }}>{TEKS_MEMBER}</p>
+          </>
+        )}
+
+        {buatJenis && (
+          <div className="form-actions">
+            <button type="submit">{buatJenis === 'sesi' ? 'Buat Sesi' : 'Buka Sesi'}</button>
+          </div>
+        )}
       </form>
 
       {sesiMemberList.length > 0 && (
         <div className="card">
-          <p className="subtle" style={{ fontSize: 11, margin: '0 0 8px' }}>Sesi terakhir:</p>
+          <p className="subtle" style={{ fontSize: 11, margin: '0 0 8px' }}>Konfirmasi member terakhir:</p>
           {sesiMemberList.map((s) => (
             <div key={s.id} style={{ fontSize: 13, marginBottom: 6 }}>
               <Link href={`/member-bulanan/${s.id}`} style={{ textDecoration: 'underline' }}>
@@ -253,7 +289,7 @@ export default function AdminPage() {
         Tier-nya (50% / gratis) dihitung dari sisa kas setelah dipotong bola & lapangan.
       </p>
       <form className="card" onSubmit={prosesSubsidi}>
-        <label>Bulan (1-12)</label>
+        <label style={{ marginTop: 0 }}>Bulan (1-12)</label>
         <input type="number" min="1" max="12" value={subsidiForm.bulan} onChange={(e) => setSubsidiForm({ ...subsidiForm, bulan: e.target.value })} />
         <label>Tahun</label>
         <input type="number" value={subsidiForm.tahun} onChange={(e) => setSubsidiForm({ ...subsidiForm, tahun: e.target.value })} />
