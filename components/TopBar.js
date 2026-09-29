@@ -1,9 +1,38 @@
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 
+const BRAND_DEFAULT = { bagian1: 'BADMIN', bagian2: 'MINGGU' };
+
 export default function TopBar({ profile }) {
   const router = useRouter();
+  const [brand, setBrand] = useState(BRAND_DEFAULT);
+
+  useEffect(() => {
+    // Pakai cache lokal dulu biar gak "kedip" ganti nama, baru sinkron ke data terbaru
+    try {
+      const cache = localStorage.getItem('brand_badmin');
+      if (cache) setBrand(JSON.parse(cache));
+    } catch (e) { /* abaikan */ }
+
+    async function ambilBrand() {
+      const { data } = await supabase
+        .from('pengaturan')
+        .select('key, value')
+        .in('key', ['brand_bagian1', 'brand_bagian2']);
+      if (!data || data.length === 0) return;
+      const map = {};
+      data.forEach((r) => { map[r.key] = r.value; });
+      const baru = {
+        bagian1: map.brand_bagian1 ?? BRAND_DEFAULT.bagian1,
+        bagian2: map.brand_bagian2 ?? BRAND_DEFAULT.bagian2,
+      };
+      setBrand(baru);
+      try { localStorage.setItem('brand_badmin', JSON.stringify(baru)); } catch (e) { /* abaikan */ }
+    }
+    ambilBrand();
+  }, []);
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -13,7 +42,7 @@ export default function TopBar({ profile }) {
   return (
     <div className="topbar">
       <div className="brand">
-        BADMIN <span className="accent">MINGGU</span>
+        {brand.bagian1} <span className="accent">{brand.bagian2}</span>
       </div>
       <nav className="tabs">
         <Link href="/" className={router.pathname === '/' ? 'active' : ''}>
