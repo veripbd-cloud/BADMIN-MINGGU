@@ -21,9 +21,7 @@ export default function KelolaUser() {
 
   async function load() {
     const token = await getAccessToken();
-    const res = await fetch('/api/admin/list-users', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetch('/api/admin/list-users', { headers: { Authorization: `Bearer ${token}` } });
     const json = await res.json();
     setUsers(json.data || []);
   }
@@ -34,13 +32,9 @@ export default function KelolaUser() {
     setEditId(u.id);
     setMsg('');
     setForm({
-      nama: u.nama || '',
-      email: u.email || '',
-      password: '',
+      nama: u.nama || '', email: u.email || '', password: '',
       tanggal_daftar: u.tanggal_daftar ? u.tanggal_daftar.slice(0, 10) : '',
-      tipe: u.tipe || 'harian',
-      level_self: u.level_self || '',
-      level_final: u.level_final || '',
+      tipe: u.tipe || 'harian', level_self: u.level_self || '', level_final: u.level_final || '',
     });
   }
 
@@ -49,7 +43,7 @@ export default function KelolaUser() {
     setMsg('');
     const token = await getAccessToken();
     const body = { player_id, ...form };
-    if (!body.password) delete body.password; // jangan kirim password kosong
+    if (!body.password) delete body.password;
 
     const res = await fetch('/api/admin/update-user', {
       method: 'POST',
@@ -70,6 +64,64 @@ export default function KelolaUser() {
     (u.nama || '').toLowerCase().includes(cari.toLowerCase()) ||
     (u.email || '').toLowerCase().includes(cari.toLowerCase())
   );
+  const memberList = usersTampil.filter((u) => u.tipe === 'member');
+  const harianList = usersTampil.filter((u) => u.tipe !== 'member');
+
+  function renderCard(u) {
+    return (
+      <div className="card" key={u.id}>
+        {editId === u.id ? (
+          <div>
+            <label style={{ marginTop: 0 }}>Nama</label>
+            <input value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} />
+            <label>Email</label>
+            <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <label>Password Baru (kosongin kalau gak mau ganti)</label>
+            <input type="text" placeholder="min. 6 karakter" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            <label>Tanggal Daftar (member sejak)</label>
+            <input type="date" value={form.tanggal_daftar} onChange={(e) => setForm({ ...form, tanggal_daftar: e.target.value })} />
+            <label>Status</label>
+            <select value={form.tipe} onChange={(e) => setForm({ ...form, tipe: e.target.value })}>
+              <option value="member">Member</option>
+              <option value="harian">Harian</option>
+            </select>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <label>Level Pengajuan</label>
+                <select value={form.level_self} onChange={(e) => setForm({ ...form, level_self: e.target.value })}>
+                  <option value="">-</option>
+                  <option value="Bisa Jump Smash">Bisa Jump Smash</option>
+                  <option value="Tidak Bisa Jump Smash">Tidak Bisa Jump Smash</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <label>Level Final</label>
+                <select value={form.level_final} onChange={(e) => setForm({ ...form, level_final: e.target.value })}>
+                  <option value="">-</option>
+                  <option value="Bisa Jump Smash">Bisa Jump Smash</option>
+                  <option value="Tidak Bisa Jump Smash">Tidak Bisa Jump Smash</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-actions" style={{ display: 'flex', gap: 8 }}>
+              <button disabled={busy} onClick={() => simpan(u.id)}>{busy ? 'Menyimpan...' : 'Simpan'}</button>
+              <button type="button" className="secondary" onClick={() => setEditId(null)}>Batal</button>
+            </div>
+          </div>
+        ) : (
+          <div className="card-row">
+            <div>
+              <strong>{u.nama}</strong>
+              <div className="subtle" style={{ fontSize: 11, marginTop: 2 }}>
+                {u.email} · Level: {u.level_final || '-'} (usulan: {u.level_self || '-'})
+              </div>
+            </div>
+            <button className="secondary" onClick={() => mulaiEdit(u)}>Edit</button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="wrap">
@@ -81,68 +133,15 @@ export default function KelolaUser() {
       </p>
 
       <input placeholder="Cari nama/email..." value={cari} onChange={(e) => setCari(e.target.value)} style={{ marginBottom: 16 }} />
-
       {msg && <p className={msg === 'Tersimpan.' ? 'success' : 'error'}>{msg}</p>}
 
-      {usersTampil.map((u) => (
-        <div className="card" key={u.id}>
-          {editId === u.id ? (
-            <div>
-              <label style={{ marginTop: 0 }}>Nama</label>
-              <input value={form.nama} onChange={(e) => setForm({ ...form, nama: e.target.value })} />
+      <h2>Member ({memberList.length})</h2>
+      {memberList.length === 0 && <div className="empty">Tidak ada.</div>}
+      {memberList.map(renderCard)}
 
-              <label>Email</label>
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-
-              <label>Password Baru (kosongin kalau gak mau ganti)</label>
-              <input type="text" placeholder="min. 6 karakter" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-
-              <label>Tanggal Daftar (member sejak)</label>
-              <input type="date" value={form.tanggal_daftar} onChange={(e) => setForm({ ...form, tanggal_daftar: e.target.value })} />
-
-              <label>Status</label>
-              <select value={form.tipe} onChange={(e) => setForm({ ...form, tipe: e.target.value })}>
-                <option value="member">Member</option>
-                <option value="harian">Harian</option>
-              </select>
-
-              <div style={{ display: 'flex', gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <label>Level Pengajuan</label>
-                  <select value={form.level_self} onChange={(e) => setForm({ ...form, level_self: e.target.value })}>
-                    <option value="">-</option>
-                    <option value="Bisa Jump Smash">Bisa Jump Smash</option>
-                    <option value="Tidak Bisa Jump Smash">Tidak Bisa Jump Smash</option>
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label>Level Final</label>
-                  <select value={form.level_final} onChange={(e) => setForm({ ...form, level_final: e.target.value })}>
-                    <option value="">-</option>
-                    <option value="Bisa Jump Smash">Bisa Jump Smash</option>
-                    <option value="Tidak Bisa Jump Smash">Tidak Bisa Jump Smash</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="form-actions" style={{ display: 'flex', gap: 8 }}>
-                <button disabled={busy} onClick={() => simpan(u.id)}>{busy ? 'Menyimpan...' : 'Simpan'}</button>
-                <button type="button" className="secondary" onClick={() => setEditId(null)}>Batal</button>
-              </div>
-            </div>
-          ) : (
-            <div className="card-row">
-              <div>
-                <strong>{u.nama}</strong>
-                <div className="subtle" style={{ fontSize: 11, marginTop: 2 }}>
-                  {u.email} · {u.tipe === 'member' ? 'Member' : 'Harian'} · Level: {u.level_final || '-'} (usulan: {u.level_self || '-'})
-                </div>
-              </div>
-              <button className="secondary" onClick={() => mulaiEdit(u)}>Edit</button>
-            </div>
-          )}
-        </div>
-      ))}
+      <h2>Harian ({harianList.length})</h2>
+      {harianList.length === 0 && <div className="empty">Tidak ada.</div>}
+      {harianList.map(renderCard)}
     </div>
   );
 }
