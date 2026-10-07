@@ -34,9 +34,6 @@ export default function Kas() {
     const { data: o } = await supabase.from('outstanding').select('*').eq('status', 'belum_lunas');
     setOutstanding(o || []);
 
-    // PENTING: .filter(Boolean) di sini — outstanding milik GUEST punya player_id = null.
-    // Kalau null itu ikut masuk ke query .in('id', ids), SELURUH query pencarian nama
-    // ikut gagal (bukan cuma guest doang), makanya harian juga sempat kebaca "-".
     const idsOutstanding = (o || []).map((x) => x.player_id).filter(Boolean);
     const idsTransaksi = (t || []).map((x) => x.player_id).filter(Boolean);
     const ids = [...new Set([...idsOutstanding, ...idsTransaksi])];
@@ -64,7 +61,7 @@ export default function Kas() {
     return (
       <div className="wrap">
         <TopBar profile={profile} />
-        <h1>Kas</h1>
+        <h1>Kas & Shuttlecock</h1>
         <div className="empty">Halaman ini cuma buat member.</div>
       </div>
     );
@@ -131,7 +128,7 @@ export default function Kas() {
   return (
     <div className="wrap">
       <TopBar profile={profile} />
-      <h1>Kas</h1>
+      <h1>Kas & Shuttlecock</h1>
       {msg && <p className="error">{msg}</p>}
 
       <div className="stat">
@@ -155,11 +152,7 @@ export default function Kas() {
               <div style={{ fontSize: 11, color: 'var(--muted)' }}>{o.keterangan} · Rp{o.nominal.toLocaleString('id-ID')}</div>
             </div>
             {isAdmin && (
-              <button
-                className="secondary"
-                disabled={processingId === o.id}
-                onClick={() => lunasi(o.id)}
-              >
+              <button className="secondary" disabled={processingId === o.id} onClick={() => lunasi(o.id)}>
                 {processingId === o.id ? 'Memproses...' : 'Tandai Lunas'}
               </button>
             )}
@@ -247,10 +240,7 @@ export default function Kas() {
               <option value="lain_lain">Lain-lain</option>
             </select>
             <label>Nominal (Rp)</label>
-            <input
-              value={formatRibuan(form.nominal)}
-              onChange={(e) => setForm({ ...form, nominal: parseRibuan(e.target.value) })}
-            />
+            <input value={formatRibuan(form.nominal)} onChange={(e) => setForm({ ...form, nominal: parseRibuan(e.target.value) })} />
             <label>Keterangan</label>
             <input value={form.keterangan} onChange={(e) => setForm({ ...form, keterangan: e.target.value })} />
             {msg && <p className="error">{msg}</p>}
