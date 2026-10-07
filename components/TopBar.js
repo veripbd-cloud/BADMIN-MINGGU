@@ -10,7 +10,6 @@ export default function TopBar({ profile }) {
   const [brand, setBrand] = useState(BRAND_DEFAULT);
 
   useEffect(() => {
-    // Pakai cache lokal dulu biar gak "kedip" ganti nama, baru sinkron ke data terbaru
     try {
       const cache = localStorage.getItem('brand_badmin');
       if (cache) setBrand(JSON.parse(cache));
@@ -50,7 +49,7 @@ export default function TopBar({ profile }) {
         </Link>
         {profile && (profile.tipe === 'member' || profile.role === 'admin' || profile.role === 'super_admin') && (
           <Link href="/kas" className={router.pathname === '/kas' ? 'active' : ''}>
-            Kas
+            Kas & Shuttlecock
           </Link>
         )}
         <Link href="/profile" className={router.pathname === '/profile' ? 'active' : ''}>
