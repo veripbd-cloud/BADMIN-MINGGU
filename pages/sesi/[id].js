@@ -10,13 +10,9 @@ function namaPeserta(p, profiles) {
   return profiles[p.player_id]?.nama || p.nama_guest || 'Guest';
 }
 
-// Header section yang bisa di-collapse, segitiga solid nyesuain ukuran teks
 function HeaderCollapse({ children, terbuka, onToggle }) {
   return (
-    <div
-      onClick={onToggle}
-      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}
-    >
+    <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
       <h2 style={{ margin: 0 }}>{children}</h2>
       <span style={{ fontSize: 12, lineHeight: 1 }}>{terbuka ? '▲' : '▼'}</span>
     </div>
@@ -28,7 +24,7 @@ export default function DetailSesi() {
   const { id } = router.query;
   const { profile, loading } = useAuth();
   const [sesi, setSesi] = useState(null);
-  const [pendaftaran, setPendaftaran] = useState([]);
+  const [semuaPendaftaran, setSemuaPendaftaran] = useState([]);
   const [profiles, setProfiles] = useState({});
   const [pilihanPerLapangan, setPilihanPerLapangan] = useState({});
   const [namaGuestBaru, setNamaGuestBaru] = useState('');
@@ -62,9 +58,8 @@ export default function DetailSesi() {
       .from('pendaftaran_sesi')
       .select('*')
       .eq('sesi_id', id)
-      .neq('status_daftar', 'batal')
       .order('waktu_daftar', { ascending: true });
-    setPendaftaran(pendaftaranData || []);
+    setSemuaPendaftaran(pendaftaranData || []);
 
     const ids = (pendaftaranData || []).map((p) => p.player_id).filter(Boolean);
     if (ids.length) {
@@ -77,12 +72,16 @@ export default function DetailSesi() {
 
   useEffect(() => { load(); }, [id, isAdmin]);
 
-  const terdaftarMember = pendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'member');
-  const terdaftarHarian = pendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'harian');
-  const terdaftarGuest = pendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'guest');
-  const waitingMember = pendaftaran.filter((p) => p.status_daftar === 'waiting_list' && p.tipe_slot === 'member');
-  const waitingHarian = pendaftaran.filter((p) => p.status_daftar === 'waiting_list' && p.tipe_slot === 'harian');
+  const terdaftarMember = semuaPendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'member');
+  const terdaftarHarian = semuaPendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'harian');
+  const terdaftarGuest = semuaPendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'guest');
+  const batalMember = semuaPendaftaran.filter((p) => p.status_daftar === 'batal' && p.tipe_slot === 'member');
+  const waitingMember = semuaPendaftaran.filter((p) => p.status_daftar === 'waiting_list' && p.tipe_slot === 'member');
+  const waitingHarian = semuaPendaftaran.filter((p) => p.status_daftar === 'waiting_list' && p.tipe_slot === 'harian');
   const semuaTerdaftar = [...terdaftarMember, ...terdaftarHarian, ...terdaftarGuest];
+
+  const totalMemberSesi = terdaftarMember.length + batalMember.length;
+  const totalHarianGuest = terdaftarHarian.length + terdaftarGuest.length;
 
   const antrianMenunggu = semuaTerdaftar
     .filter((p) => p.waktu_checkin && p.status_main !== 'main')
@@ -140,9 +139,7 @@ export default function DetailSesi() {
   function togglePilihan(kodeLapangan, pendaftaran_id) {
     setPilihanPerLapangan((prev) => {
       const current = prev[kodeLapangan] || [];
-      const next = current.includes(pendaftaran_id)
-        ? current.filter((x) => x !== pendaftaran_id)
-        : [...current, pendaftaran_id];
+      const next = current.includes(pendaftaran_id) ? current.filter((x) => x !== pendaftaran_id) : [...current, pendaftaran_id];
       return { ...prev, [kodeLapangan]: next };
     });
   }
@@ -173,7 +170,6 @@ export default function DetailSesi() {
 
   const sesiBerakhir = new Date() > new Date(sesi.tanggal + 'T10:00:00+07:00');
   const bisaAdminKontrol = isAdmin && !sesiBerakhir;
-  const totalHarianGuest = terdaftarHarian.length + terdaftarGuest.length;
 
   return (
     <div className="wrap">
@@ -188,7 +184,7 @@ export default function DetailSesi() {
       {msg && <p className="error">{msg}</p>}
 
       <HeaderCollapse terbuka={bukaMember} onToggle={() => setBukaMember(!bukaMember)}>
-        Terdaftar — Member ({terdaftarMember.length}/{sesi.kuota_member})
+        Terdaftar — Member ({terdaftarMember.length}/{totalMemberSesi})
       </HeaderCollapse>
       {bukaMember && (
         <ListPeserta items={terdaftarMember} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} />
@@ -250,11 +246,8 @@ export default function DetailSesi() {
             {DAFTAR_LAPANGAN.map((kode) => {
               const pemain = pemainDiLapangan(kode);
               const kosong = pemain.length === 0;
-
               const terpilihDiLapanganLain = new Set(
-                Object.entries(pilihanPerLapangan)
-                  .filter(([k]) => k !== kode)
-                  .flatMap(([, ids]) => ids)
+                Object.entries(pilihanPerLapangan).filter(([k]) => k !== kode).flatMap(([, ids]) => ids)
               );
               const antrianBuatKartuIni = antrianMenunggu.filter((p) => !terpilihDiLapanganLain.has(p.id));
 
@@ -290,9 +283,7 @@ export default function DetailSesi() {
                           const terpilih = (pilihanPerLapangan[kode] || []).includes(p.id);
                           return (
                             <button
-                              key={p.id}
-                              type="button"
-                              className={terpilih ? '' : 'secondary'}
+                              key={p.id} type="button" className={terpilih ? '' : 'secondary'}
                               style={{ fontSize: 13, padding: '6px 10px' }}
                               onClick={() => togglePilihan(kode, p.id)}
                             >
