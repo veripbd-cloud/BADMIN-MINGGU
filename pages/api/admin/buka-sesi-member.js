@@ -1,5 +1,7 @@
 import { supabaseAdmin, getProfileFromRequest, isAdmin } from '../../../lib/supabaseAdmin';
 
+const BULAN_KUARTAL_AKHIR = [12, 3, 6, 9];
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -9,8 +11,17 @@ export default async function handler(req, res) {
   const { bulan, tahun, label } = req.body;
   if (!bulan || !tahun) return res.status(400).json({ error: 'bulan & tahun wajib diisi' });
 
-  // Deadline = 2 hari sejak dibuka, jam 23:59 WIB di hari ke-2 itu.
-  // Dihitung pakai UTC math + offset eksplisit +07:00, gak gantung timezone device admin.
+  if (BULAN_KUARTAL_AKHIR.includes(parseInt(bulan, 10))) {
+    const { data: biayaBolaSetting } = await supabaseAdmin
+      .from('pengaturan').select('value').eq('key', 'biaya_bola_bulan_ini').maybeSingle();
+    const biayaBola = parseInt(biayaBolaSetting?.value || '0', 10);
+    if (!biayaBola || biayaBola <= 0) {
+      return res.status(400).json({
+        error: 'Bulan ini adalah bulan penghitungan subsidi (Des/Mar/Jun/Sep). Isi dulu "Biaya bola bulan ini" di Pengaturan Harga, Kuota & Nama Brand sebelum buka sesi ini.',
+      });
+    }
+  }
+
   const sekarang = new Date();
   const duaHariLagi = new Date(sekarang.getTime() + 2 * 24 * 60 * 60 * 1000);
   const yyyy = duaHariLagi.getUTCFullYear();
@@ -21,14 +32,10 @@ export default async function handler(req, res) {
   const { data, error } = await supabaseAdmin
     .from('sesi_member_bulanan')
     .insert({
-      bulan: parseInt(bulan, 10),
-      tahun: parseInt(tahun, 10),
-      label: label || null,
-      dibuka_pada: sekarang.toISOString(),
-      deadline_daftar: deadline.toISOString(),
+      bulan: parseInt(bulan, 10), tahun: parseInt(tahun, 10), label: label || null,
+      dibuka_pada: sekarang.toISOString(), deadline_daftar: deadline.toISOString(),
     })
-    .select()
-    .single();
+    .select().single();
 
   if (error) return res.status(500).json({ error: error.message });
   return res.status(200).json({ data });
