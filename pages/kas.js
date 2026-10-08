@@ -24,6 +24,7 @@ export default function Kas() {
   const [stokForm, setStokForm] = useState({ arah: 'tambah', slop: '', piece: '' });
   const [showSemuaTransaksi, setShowSemuaTransaksi] = useState(false);
   const [showSemuaStok, setShowSemuaStok] = useState(false);
+  const [bukaOutstanding, setBukaOutstanding] = useState(false);
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
@@ -144,10 +145,6 @@ export default function Kas() {
               <span className="label">Saldo kas saat ini</span>
               <span className="num">Rp{saldo.toLocaleString('id-ID')}</span>
             </div>
-            <div className="item">
-              <span className="label">Total outstanding</span>
-              <span className="num">Rp{totalOutstanding.toLocaleString('id-ID')}</span>
-            </div>
           </div>
         </div>
         <div>
@@ -162,9 +159,22 @@ export default function Kas() {
         </div>
       </div>
 
-      <h2>Outstanding — Belum Bayar</h2>
-      {outstanding.length === 0 && <div className="empty">Tidak ada outstanding. 🎉</div>}
-      {outstanding.map((o) => (
+      <div className="stat" style={{ marginTop: 16 }}>
+        <div className="item">
+          <span className="label">Total outstanding</span>
+          <span className="num">Rp{totalOutstanding.toLocaleString('id-ID')}</span>
+        </div>
+      </div>
+
+      <div
+        onClick={() => setBukaOutstanding(!bukaOutstanding)}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none', margin: '28px 0 10px' }}
+      >
+        <h2 style={{ margin: 0 }}>Outstanding — Belum Bayar{outstanding.length > 0 ? ` (${outstanding.length})` : ''}</h2>
+        <span style={{ fontSize: 12, lineHeight: 1 }}>{bukaOutstanding ? '▲' : '▼'}</span>
+        {outstanding.length === 0 && <span className="subtle" style={{ fontSize: 11 }}>Tidak ada outstanding. 🎉</span>}
+      </div>
+      {bukaOutstanding && outstanding.map((o) => (
         <div className="card outstanding-item" key={o.id}>
           <div className="card-row">
             <div>
