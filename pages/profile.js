@@ -9,14 +9,23 @@ function hitungTenure(profile) {
   const mulai = new Date(sumber);
   const now = new Date();
   const bulan = (now.getFullYear() - mulai.getFullYear()) * 12 + (now.getMonth() - mulai.getMonth());
-  if (bulan < 1) return 'Baru gabung bulan ini';
-  return `Member sejak ${mulai.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })} (${bulan} bulan)`;
+  if (bulan < 1) return 'baru gabung bulan ini';
+  return `sejak ${mulai.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })} (${bulan} bulan)`;
+}
+
+function labelRiwayat(r) {
+  if (r.status_hadir === 'hadir') return 'Hadir';
+  if (r.status_hadir === 'no_show') return 'Tidak Hadir';
+  if (r.status_daftar === 'batal') return 'Batal';
+  if (r.status_daftar === 'terdaftar') return 'Terdaftar';
+  return 'Waiting list';
 }
 
 export default function Profile() {
   const { profile, loading } = useAuth();
   const [riwayat, setRiwayat] = useState([]);
   const [outstanding, setOutstanding] = useState([]);
+
   const [namaTampil, setNamaTampil] = useState('');
   const [modeEdit, setModeEdit] = useState(false);
   const [namaBaru, setNamaBaru] = useState('');
@@ -67,15 +76,9 @@ export default function Profile() {
     if (!namaBaru.trim()) return;
     setMenyimpan(true);
     setSimpanMsg('');
-    const { error } = await supabase
-      .from('profiles')
-      .update({ nama: namaBaru.trim() })
-      .eq('id', profile.id);
+    const { error } = await supabase.from('profiles').update({ nama: namaBaru.trim() }).eq('id', profile.id);
     setMenyimpan(false);
-    if (error) {
-      setSimpanMsg('Gagal ganti nama: ' + error.message);
-      return;
-    }
+    if (error) { setSimpanMsg('Gagal ganti nama: ' + error.message); return; }
     setNamaTampil(namaBaru.trim());
     setModeEdit(false);
   }
@@ -87,10 +90,7 @@ export default function Profile() {
     setSimpanEmailMsg('');
     const { error } = await supabase.auth.updateUser({ email: emailBaru.trim() });
     setMenyimpanEmail(false);
-    if (error) {
-      setSimpanEmailMsg('Gagal ganti email: ' + error.message);
-      return;
-    }
+    if (error) { setSimpanEmailMsg('Gagal ganti email: ' + error.message); return; }
     setSimpanEmailMsg('Berhasil. Kalau ada minta konfirmasi lewat email, cek inbox kamu dulu.');
     setEmailTampil(emailBaru.trim());
     setModeEditEmail(false);
@@ -98,12 +98,14 @@ export default function Profile() {
 
   if (loading || !profile) return null;
 
+  const tombolPensil = { padding: '4px 8px', fontSize: 12, lineHeight: 1 };
+
   return (
     <div className="wrap">
       <TopBar profile={profile} />
 
       {modeEdit ? (
-        <form onSubmit={simpanNama} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 4 }}>
+        <form onSubmit={simpanNama} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 12 }}>
           <div style={{ flex: 1 }}>
             <label style={{ marginTop: 0 }}>Nama</label>
             <input value={namaBaru} onChange={(e) => setNamaBaru(e.target.value)} autoFocus />
@@ -112,70 +114,63 @@ export default function Profile() {
           <button type="button" className="secondary" onClick={() => setModeEdit(false)}>Batal</button>
         </form>
       ) : (
-        <div className="card-row" style={{ marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <h1 style={{ margin: 0 }}>{namaTampil}</h1>
           <button
             className="secondary"
             onClick={() => { setNamaBaru(namaTampil); setModeEdit(true); }}
-            aria-label="Ganti nama"
-            title="Ganti nama"
-            style={{ padding: '6px 10px', fontSize: 14, lineHeight: 1 }}
+            aria-label="Ganti nama" title="Ganti nama" style={tombolPensil}
           >
             ✏️
           </button>
         </div>
       )}
       {simpanMsg && <p className="error">{simpanMsg}</p>}
-      <p className="subtle">{hitungTenure(profile)}</p>
 
-      {modeEditEmail ? (
-        <form onSubmit={simpanEmail} style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginBottom: 8 }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ marginTop: 0 }}>Email</label>
-            <input type="email" value={emailBaru} onChange={(e) => setEmailBaru(e.target.value)} autoFocus />
-          </div>
-          <button type="submit" disabled={menyimpanEmail}>{menyimpanEmail ? '...' : 'Simpan'}</button>
-          <button type="button" className="secondary" onClick={() => setModeEditEmail(false)}>Batal</button>
-        </form>
-      ) : (
-        <div className="card-row" style={{ marginBottom: 8 }}>
-          <span className="subtle" style={{ fontSize: 12 }}>{emailTampil}</span>
-          <button
-            className="secondary"
-            onClick={() => { setEmailBaru(emailTampil); setModeEditEmail(true); setSimpanEmailMsg(''); }}
-            aria-label="Ganti email"
-            title="Ganti email"
-            style={{ padding: '4px 8px', fontSize: 12, lineHeight: 1 }}
-          >
-            ✏️
-          </button>
-        </div>
-      )}
-      {simpanEmailMsg && <p className={simpanEmailMsg.startsWith('Gagal') ? 'error' : 'success'}>{simpanEmailMsg}</p>}
-
-      <p className="subtle" style={{ fontSize: 12, marginBottom: 20 }}>
-        <Link href="/reset-password" style={{ textDecoration: 'underline' }}>Ganti Password</Link>
-      </p>
-
-      <div className="stat">
+      <div className="stat" style={{ alignItems: 'flex-start', gap: 32 }}>
         <div className="item">
           <span className="label">Status</span>
           <span className="num">{profile.tipe === 'member' ? 'Member' : 'Harian'}</span>
+          <span className="subtle" style={{ fontSize: 11 }}>{hitungTenure(profile)}</span>
         </div>
+
         <div className="item">
           <span className="label">Level</span>
           <span className="num">{profile.level_final || 'Belum di-review'}</span>
           {profile.level_self && (
-            <div className="subtle" style={{ fontSize: 11, marginTop: 4 }}>
-              Usulan: {profile.level_self} {profile.status_approval !== 'approved' && '(menunggu admin)'}
-            </div>
+            <span className="subtle" style={{ fontSize: 11 }}>
+              Usulan: {profile.level_self}{profile.status_approval !== 'approved' ? ' (menunggu admin)' : ''}
+            </span>
           )}
         </div>
+
         <div className="item">
-          <span className="label">Status akun</span>
-          <span className="num">{profile.status_approval === 'approved' ? 'Terverifikasi' : 'Menunggu review'}</span>
+          <span className="label">Akun</span>
+          {modeEditEmail ? (
+            <form onSubmit={simpanEmail} style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
+              <input type="email" value={emailBaru} onChange={(e) => setEmailBaru(e.target.value)} autoFocus style={{ minWidth: 180 }} />
+              <button type="submit" disabled={menyimpanEmail} style={{ padding: '6px 12px' }}>{menyimpanEmail ? '...' : 'Simpan'}</button>
+              <button type="button" className="secondary" style={{ padding: '6px 12px' }} onClick={() => setModeEditEmail(false)}>Batal</button>
+            </form>
+          ) : (
+            <span className="num" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {emailTampil}
+              <button
+                className="secondary"
+                onClick={() => { setEmailBaru(emailTampil); setModeEditEmail(true); setSimpanEmailMsg(''); }}
+                aria-label="Ganti email" title="Ganti email" style={tombolPensil}
+              >
+                ✏️
+              </button>
+            </span>
+          )}
+          <Link href="/reset-password" style={{ textDecoration: 'underline', fontSize: 11 }}>Ganti Password</Link>
+          <span className="subtle" style={{ fontSize: 11, display: 'block', marginTop: 2 }}>
+            {profile.status_approval === 'approved' ? 'Terverifikasi' : 'Menunggu review'}
+          </span>
         </div>
       </div>
+      {simpanEmailMsg && <p className={simpanEmailMsg.startsWith('Gagal') ? 'error' : 'success'}>{simpanEmailMsg}</p>}
 
       {outstanding.length > 0 && (
         <>
@@ -195,7 +190,7 @@ export default function Profile() {
           <div className="card-row">
             <span>{r.sesi?.label || r.sesi?.tanggal}</span>
             <span className={`badge ${r.status_hadir === 'hadir' ? 'done' : r.status_hadir === 'no_show' ? 'warn' : ''}`}>
-              {r.status_hadir === 'hadir' ? 'Hadir' : r.status_hadir === 'no_show' ? 'Tidak Hadir' : r.status_daftar === 'terdaftar' ? 'Terdaftar' : 'Waiting list'}
+              {labelRiwayat(r)}
             </span>
           </div>
         </div>

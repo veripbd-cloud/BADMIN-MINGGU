@@ -28,7 +28,10 @@ export default function Kas() {
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
   async function load() {
-    const { data: t } = await supabase.from('transaksi_kas').select('*').order('tanggal', { ascending: false }).order('created_at', { ascending: false }).limit(50);
+    // PENTING: TIDAK pakai .limit() di sini -- saldo kas dihitung dari SEMUA transaksi
+    // yang pernah ada, bukan cuma 50 terbaru. Kalau dibatasi, transaksi lama yang
+    // "kepotong" bikin saldo keliatan salah/minus begitu udah lewat 50 baris.
+    const { data: t } = await supabase.from('transaksi_kas').select('*').order('tanggal', { ascending: false }).order('created_at', { ascending: false });
     setTransaksi(t || []);
 
     const { data: o } = await supabase.from('outstanding').select('*').eq('status', 'belum_lunas');
@@ -44,11 +47,13 @@ export default function Kas() {
       setProfilesMap(map);
     }
 
+    // Stok shuttlecock aman dari isu yang sama -- tiap baris nyimpen saldo_setelah
+    // sendiri (dihitung server-side pas insert), jadi gak bergantung sama client
+    // nge-jumlahin dari daftar yang dibatasi. Tapi .limit() tetep dibuang biar konsisten.
     const { data: stokData } = await supabase
       .from('stok_shuttle_log')
       .select('*')
-      .order('waktu', { ascending: false })
-      .limit(50);
+      .order('waktu', { ascending: false });
     setStokLog(stokData || []);
   }
 
@@ -131,14 +136,29 @@ export default function Kas() {
       <h1>Kas & Shuttlecock</h1>
       {msg && <p className="error">{msg}</p>}
 
-      <div className="stat">
-        <div className="item">
-          <span className="label">Saldo kas saat ini</span>
-          <span className="num">Rp{saldo.toLocaleString('id-ID')}</span>
+      <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap', marginBottom: 8 }}>
+        <div>
+          <h2 style={{ margin: '0 0 8px' }}>Kas</h2>
+          <div className="stat">
+            <div className="item">
+              <span className="label">Saldo kas saat ini</span>
+              <span className="num">Rp{saldo.toLocaleString('id-ID')}</span>
+            </div>
+            <div className="item">
+              <span className="label">Total outstanding</span>
+              <span className="num">Rp{totalOutstanding.toLocaleString('id-ID')}</span>
+            </div>
+          </div>
         </div>
-        <div className="item">
-          <span className="label">Total outstanding</span>
-          <span className="num">Rp{totalOutstanding.toLocaleString('id-ID')}</span>
+        <div>
+          <h2 style={{ margin: '0 0 8px' }}>Shuttlecock</h2>
+          <div className="stat">
+            <div className="item">
+              <span className="label">Sisa stok saat ini</span>
+              <span className="num">{stokSlop} slop {stokSisaPiece} piece</span>
+              <span className="subtle" style={{ fontSize: 11 }}>({stokPiece} piece total)</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -160,16 +180,11 @@ export default function Kas() {
         </div>
       ))}
 
-      <h2>Stock Shuttlecock</h2>
+      <h2>Update Stok Shuttlecock</h2>
       <div className="card">
-        <div className="card-row" style={{ marginBottom: isAdmin ? 14 : 0 }}>
-          <span>Sisa stok saat ini</span>
-          <strong>{stokSlop} slop {stokSisaPiece} piece <span className="subtle" style={{ fontWeight: 400, fontSize: 11 }}>({stokPiece} piece total)</span></strong>
-        </div>
-
         {isAdmin && (
           <form onSubmit={updateStok}>
-            <label>Arah</label>
+            <label style={{ marginTop: 0 }}>Arah</label>
             <select value={stokForm.arah} onChange={(e) => setStokForm({ ...stokForm, arah: e.target.value })}>
               <option value="tambah">Tambah stok (beli baru)</option>
               <option value="set_sisa">Set sisa stok (hitung real, sistem yang hitung terpakai)</option>
@@ -226,7 +241,7 @@ export default function Kas() {
         <>
           <h2>Catat Transaksi</h2>
           <form className="card" onSubmit={tambahTransaksi}>
-            <label>Jenis</label>
+            <label style={{ marginTop: 0 }}>Jenis</label>
             <select value={form.jenis} onChange={(e) => setForm({ ...form, jenis: e.target.value })}>
               <option value="pengeluaran">Kredit (pengeluaran)</option>
               <option value="pemasukan">Debit (pemasukan)</option>
