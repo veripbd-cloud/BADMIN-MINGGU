@@ -22,9 +22,9 @@ html, body {
   min-height: 100vh;
 }
 a { color: inherit; }
-@keyframes naikPelan { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes naikPelan { from { transform: translateY(6px); } to { transform: translateY(0); } }
 @keyframes munculPelan { from { opacity: 0; } to { opacity: 1; } }
-.wrap { max-width: 780px; margin: 0 auto; padding: 24px 20px 80px; animation: munculPelan 0.35s var(--ease) both; }
+.wrap { max-width: 780px; margin: 0 auto; padding: 24px 20px 80px; }
 .topbar { display: flex; align-items: center; justify-content: space-between; padding-bottom: 18px; border-bottom: 1px solid #ffffff22; margin-bottom: 24px; }
 .brand { font-family: var(--font-display); font-weight: 700; font-size: 14px; letter-spacing: 0.2px; }
 .brand .accent { color: var(--shuttle-yellow); }
