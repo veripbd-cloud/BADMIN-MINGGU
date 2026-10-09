@@ -20,8 +20,8 @@ export default function App({ Component, pageProps }) {
         <meta property="og:description" content={DESKRIPSI} />
         <meta property="og:url" content={SITE_URL} />
         <meta property="og:image" content={`${SITE_URL}/og-image.png`} />
-        <meta property="og:image:width" content="600" />
-        <meta property="og:image:height" content="600" />
+        <meta property="og:image:width" content="300" />
+        <meta property="og:image:height" content="300" />
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:title" content={JUDUL} />
         <meta name="twitter:description" content={DESKRIPSI} />
