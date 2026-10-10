@@ -45,6 +45,13 @@ export default function TopBar({ profile }) {
     ambilBrand();
   }, []);
 
+  // Tab induk tetap nyala di halaman turunannya (detail sesi, Kelola User, dll)
+  const path = router.pathname;
+  const aktifSesi = path === '/' || path.startsWith('/sesi') || path.startsWith('/member-bulanan');
+  const aktifKas = path.startsWith('/kas');
+  const aktifProfil = path.startsWith('/profile') || path === '/reset-password';
+  const aktifAdmin = path.startsWith('/admin');
+
   async function signOut() {
     await supabase.auth.signOut();
     router.push('/login');
@@ -56,19 +63,19 @@ export default function TopBar({ profile }) {
         {brand.bagian1} <span className="accent">{brand.bagian2}</span>
       </div>
       <nav className="tabs">
-        <Link href="/" className={router.pathname === '/' ? 'active' : ''}>
+        <Link href="/" className={aktifSesi ? 'active' : ''}>
           Sesi & Member
         </Link>
         {profile && (profile.tipe === 'member' || profile.role === 'admin' || profile.role === 'super_admin') && (
-          <Link href="/kas" className={router.pathname === '/kas' ? 'active' : ''}>
+          <Link href="/kas" className={aktifKas ? 'active' : ''}>
             Kas & Shuttlecock
           </Link>
         )}
-        <Link href="/profile" className={router.pathname === '/profile' ? 'active' : ''}>
+        <Link href="/profile" className={aktifProfil ? 'active' : ''}>
           Profil
         </Link>
         {profile && (profile.role === 'admin' || profile.role === 'super_admin') && (
-          <Link href="/admin" className={router.pathname === '/admin' ? 'active' : ''}>
+          <Link href="/admin" className={aktifAdmin ? 'active' : ''}>
             Admin
           </Link>
         )}
