@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabaseClient';
 const BRAND_DEFAULT = { bagian1: 'BADMIN', bagian2: 'MINGGU' };
 const CACHE_NILAI = 'brand_badmin';
 const CACHE_WAKTU = 'brand_badmin_t';
-const MASA_SEGAR_MS = 10 * 60 * 1000;
+const MASA_SEGAR_MS = 60 * 1000; // 1 menit: nama brand cepat sinkron antar perangkat
 
 export default function TopBar({ profile }) {
   const router = useRouter();
