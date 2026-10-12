@@ -55,7 +55,11 @@ export default function AdminPage() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(pengaturan),
     });
-    if (!res.ok) { tampilPesan('Gagal menyimpan pengaturan.', true); return; }
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      tampilPesan(json.error || 'Gagal menyimpan pengaturan.', true);
+      return;
+    }
     try {
       localStorage.setItem('brand_badmin', JSON.stringify({
         bagian1: pengaturan.brand_bagian1 ?? 'BADMIN',
