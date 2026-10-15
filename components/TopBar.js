@@ -5,44 +5,34 @@ import { supabase } from '../lib/supabaseClient';
 
 const BRAND_DEFAULT = { bagian1: 'BADMIN', bagian2: 'MINGGU' };
 const CACHE_NILAI = 'brand_badmin';
-const CACHE_WAKTU = 'brand_badmin_t';
-const MASA_SEGAR_MS = 60 * 1000; // 1 menit: nama brand cepat sinkron antar perangkat
 
 export default function TopBar({ profile }) {
   const router = useRouter();
   const [brand, setBrand] = useState(BRAND_DEFAULT);
 
   useEffect(() => {
+    let masihAda = true;
+
+    // Tampilkan nama dari cache dulu biar gak kedip
     try {
       const nilai = localStorage.getItem(CACHE_NILAI);
-      const waktu = parseInt(localStorage.getItem(CACHE_WAKTU) || '0', 10);
-      if (nilai) {
-        setBrand(JSON.parse(nilai));
-        // Cache masih segar -> gak perlu nanya ke server lagi (hemat 1 request per halaman)
-        if (Date.now() - waktu < MASA_SEGAR_MS) return;
-      }
+      if (nilai) setBrand(JSON.parse(nilai));
     } catch (e) { /* abaikan */ }
 
+    // Lalu SELALU cocokin ke server, jadi HP dan laptop pasti sama
     async function ambilBrand() {
       try {
-        const { data } = await supabase
-          .from('pengaturan').select('key, value')
-          .in('key', ['brand_bagian1', 'brand_bagian2']);
-        if (!data || data.length === 0) return;
-        const map = {};
-        data.forEach((r) => { map[r.key] = r.value; });
-        const baru = {
-          bagian1: map.brand_bagian1 ?? BRAND_DEFAULT.bagian1,
-          bagian2: map.brand_bagian2 ?? BRAND_DEFAULT.bagian2,
-        };
-        setBrand(baru);
-        try {
-          localStorage.setItem(CACHE_NILAI, JSON.stringify(baru));
-          localStorage.setItem(CACHE_WAKTU, String(Date.now()));
-        } catch (e) { /* abaikan */ }
-      } catch (e) { /* kalau gagal, tetep pakai nama yang ada */ }
+        const res = await fetch('/api/brand', { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!json || !json.brand || !masihAda) return;
+        setBrand(json.brand);
+        try { localStorage.setItem(CACHE_NILAI, JSON.stringify(json.brand)); } catch (e) { /* abaikan */ }
+      } catch (e) { /* kalau gagal, tetap pakai yang ada */ }
     }
     ambilBrand();
+
+    return () => { masihAda = false; };
   }, []);
 
   // Tab induk tetap nyala di halaman turunannya (detail sesi, Kelola User, dll)
