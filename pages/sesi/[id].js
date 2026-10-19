@@ -87,7 +87,10 @@ export default function DetailSesi() {
     .filter((p) => p.waktu_checkin && p.status_main !== 'main')
     .sort((a, b) => new Date(a.waktu_checkin) - new Date(b.waktu_checkin));
 
-  const belumCheckin = semuaTerdaftar.filter((p) => !p.waktu_checkin);
+  // Yang masih perlu ditandai di atas, yang sudah "Tidak Hadir" di bawah
+  const belumCheckin = semuaTerdaftar
+    .filter((p) => !p.waktu_checkin)
+    .sort((a, b) => (a.status_hadir === 'no_show') - (b.status_hadir === 'no_show'));
 
   function pemainDiLapangan(kodeLapangan) {
     return semuaTerdaftar.filter((p) => p.status_main === 'main' && p.lapangan_sekarang === kodeLapangan);
@@ -100,8 +103,8 @@ export default function DetailSesi() {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
     });
-    const json = await res.json();
-    if (!res.ok) setMsg(json.error);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) setMsg(json.error || `Gagal (kode ${res.status})`);
     return { ok: res.ok, json };
   }
 
@@ -113,6 +116,12 @@ export default function DetailSesi() {
   async function hadirGabungan(pendaftaran_id) {
     await apiCall('/api/admin/checkin', { pendaftaran_id });
     await apiCall('/api/admin/tandai-hadir', { pendaftaran_id, status_hadir: 'hadir' });
+    load();
+  }
+
+  async function ralatHadir(pendaftaran_id) {
+    if (!confirm('Ralat status hadir/tidak-hadir ini? Outstanding yang belum dibayar (kalau ada) akan ikut dihapus.')) return;
+    await apiCall('/api/admin/ralat-hadir', { pendaftaran_id });
     load();
   }
 
@@ -187,14 +196,14 @@ export default function DetailSesi() {
         Terdaftar — Member ({terdaftarMember.length}/{totalMemberSesi})
       </HeaderCollapse>
       {bukaMember && (
-        <ListPeserta items={terdaftarMember} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} />
+        <ListPeserta items={terdaftarMember} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} onRalat={ralatHadir} />
       )}
 
       <HeaderCollapse terbuka={bukaHarian} onToggle={() => setBukaHarian(!bukaHarian)}>
         Terdaftar — Harian ({terdaftarHarian.length}/{sesi.kuota_harian})
       </HeaderCollapse>
       {bukaHarian && (
-        <ListPeserta items={terdaftarHarian} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} />
+        <ListPeserta items={terdaftarHarian} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} onRalat={ralatHadir} />
       )}
 
       <HeaderCollapse terbuka={bukaGuest} onToggle={() => setBukaGuest(!bukaGuest)}>
@@ -203,7 +212,7 @@ export default function DetailSesi() {
       {bukaGuest && (
         <>
           <p className="subtle" style={{ fontSize: 11 }}>Pemain dadakan yang ditambahkan langsung oleh admin, tanpa perlu akun. Ikut kena tagihan sama seperti harian saat ditandai Hadir.</p>
-          <ListPeserta items={terdaftarGuest} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} />
+          <ListPeserta items={terdaftarGuest} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} onRalat={ralatHadir} />
         </>
       )}
       {isAdmin && (
@@ -330,7 +339,14 @@ export default function DetailSesi() {
                 <div className="card" key={p.id}>
                   <div className="card-row">
                     <span>{namaPeserta(p, profiles)}</span>
-                    <button className="secondary" disabled={!bisaAdminKontrol} onClick={() => hadirGabungan(p.id)}>Hadir</button>
+                    {p.status_hadir === 'no_show' ? (
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span className="badge warn">Tidak Hadir</span>
+                        {bisaAdminKontrol && <button className="secondary" onClick={() => ralatHadir(p.id)}>Ralat</button>}
+                      </div>
+                    ) : (
+                      <button className="secondary" disabled={!bisaAdminKontrol} onClick={() => hadirGabungan(p.id)}>Hadir</button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -342,7 +358,7 @@ export default function DetailSesi() {
   );
 }
 
-function ListPeserta({ items, profiles, isAdmin, onHadir, onTandai, onBatalkan }) {
+function ListPeserta({ items, profiles, isAdmin, onHadir, onTandai, onBatalkan, onRalat }) {
   if (items.length === 0) return <div className="empty">Belum ada.</div>;
   return items.map((p) => {
     return (
@@ -359,11 +375,13 @@ function ListPeserta({ items, profiles, isAdmin, onHadir, onTandai, onBatalkan }
           </div>
           {isAdmin && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              {!p.status_hadir && (
+              {!p.status_hadir ? (
                 <>
                   <button className="secondary" onClick={() => onHadir(p.id)}>Hadir</button>
                   <button className="danger" onClick={() => onTandai(p.id, 'no_show')}>Tidak Hadir</button>
                 </>
+              ) : (
+                <button className="secondary" onClick={() => onRalat(p.id)}>Ralat</button>
               )}
               <button className="danger" onClick={() => onBatalkan(p.id)}>Cancel</button>
             </div>
