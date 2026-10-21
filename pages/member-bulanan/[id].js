@@ -14,7 +14,7 @@ export default function DetailMemberBulanan() {
   const [pendaftaran, setPendaftaran] = useState([]);
   const [profiles, setProfiles] = useState({});
   const [outstandingMap, setOutstandingMap] = useState({});
-  const [hasilFinalisasi, setHasilFinalisasi] = useState(null);
+  const [hasilProses, setHasilProses] = useState(null);
   const [msg, setMsg] = useState('');
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
@@ -24,6 +24,8 @@ export default function DetailMemberBulanan() {
     const { data: sesiData } = await supabase.from('sesi_member_bulanan').select('*').eq('id', id).single();
     setSesi(sesiData);
 
+    // Setelah deadline: turunkan member yang tidak daftar. Jalan SEKALI per sesi,
+    // jadi membuka halaman bulan lama aman (tidak mengubah apa pun).
     if (sesiData && isAdmin && new Date() > new Date(sesiData.deadline_daftar)) {
       const token = await getAccessToken();
       const res = await fetch('/api/admin/finalisasi-member-bulanan', {
@@ -31,9 +33,9 @@ export default function DetailMemberBulanan() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ sesi_member_bulanan_id: id }),
       });
-      const json = await res.json();
-      if (res.ok) setHasilFinalisasi(json);
-      else setMsg(json.error);
+      const json = await res.json().catch(() => ({}));
+      if (res.ok) setHasilProses(json);
+      else setMsg(json.error || `Gagal memproses (kode ${res.status})`);
     }
 
     const { data: pendaftaranData } = await supabase
@@ -72,31 +74,29 @@ export default function DetailMemberBulanan() {
       </p>
       {msg && <p className="error">{msg}</p>}
 
-      {hasilFinalisasi?.subsidi && (
-        <div className="card">
-          <p style={{ margin: 0 }}><strong>Hasil hitung subsidi kuartal ini:</strong></p>
-          <p style={{ margin: '4px 0' }}>Tier: <strong>{hasilFinalisasi.subsidi.tier === 'gratis_100' ? 'Gratis 100%' : hasilFinalisasi.subsidi.tier === 'diskon_50' ? 'Diskon 50%' : '-'}</strong></p>
-          <p style={{ margin: '4px 0' }}>Eligible: {hasilFinalisasi.subsidi.jumlah_eligible} · Tidak eligible: {hasilFinalisasi.subsidi.jumlah_tidak_eligible}</p>
-          <p style={{ margin: '4px 0' }}>Sisa kas terhitung: Rp{hasilFinalisasi.subsidi.sisa_kas_dihitung?.toLocaleString('id-ID')}</p>
-          <p className="subtle" style={{ fontSize: 11, marginTop: 6, marginBottom: 0 }}>
-            Outstanding member yang eligible udah otomatis disesuaikan (dihapus kalau gratis, dipotong setengah kalau diskon).
-          </p>
-        </div>
+      {hasilProses?.diturunkan > 0 && (
+        <p className="subtle">{hasilProses.diturunkan} member diturunkan jadi harian karena gak daftar bulan ini.</p>
       )}
-      {hasilFinalisasi && !hasilFinalisasi.subsidi && hasilFinalisasi.diturunkan > 0 && (
-        <p className="subtle">{hasilFinalisasi.diturunkan} member diturunkan jadi harian karena gak daftar bulan ini.</p>
+      {(hasilProses?.sudah || hasilProses?.dilewati) && (
+        <p className="subtle" style={{ fontSize: 11 }}>
+          Sesi ini sudah diproses sebelumnya, jadi halaman ini hanya untuk melihat daftar peserta.
+        </p>
       )}
 
       <h2>Daftar Peserta</h2>
       {pendaftaran.length === 0 && <div className="empty">Belum ada yang daftar.</div>}
       {pendaftaran.map((p) => {
-        const outstanding = outstandingMap[p.id];
-        const sudahLunas = outstanding ? outstanding.status === 'lunas' : false;
+        const o = outstandingMap[p.id];
+        const label = !o ? 'Tanpa tagihan' : o.status === 'lunas' ? 'Lunas' : 'Belum Lunas';
+        const kelas = !o ? '' : o.status === 'lunas' ? 'open' : 'warn';
         return (
           <div className="card" key={p.id}>
             <div className="card-row">
-              <span>{profiles[p.player_id]?.nama || '—'}</span>
-              <span className={`badge ${sudahLunas ? 'open' : 'warn'}`}>{sudahLunas ? 'Lunas' : 'Belum Lunas'}</span>
+              <span>
+                {profiles[p.player_id]?.nama || '—'}
+                {o && <span className="subtle" style={{ fontSize: 11 }}> · Rp{o.nominal.toLocaleString('id-ID')}</span>}
+              </span>
+              <span className={`badge ${kelas}`}>{label}</span>
             </div>
           </div>
         );
