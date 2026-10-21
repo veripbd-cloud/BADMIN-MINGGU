@@ -116,7 +116,9 @@ export default function KelolaUser() {
                 {u.email} · Level: {u.level_final || '-'} (usulan: {u.level_self || '-'})
               </div>
             </div>
-            <button className="secondary" onClick={() => mulaiEdit(u)}>Edit</button>
+            {u.role === 'super_admin' && profile.role !== 'super_admin'
+              ? <span className="badge">Terkunci</span>
+              : <button className="secondary" onClick={() => mulaiEdit(u)}>Edit</button>}
           </div>
         )}
       </div>

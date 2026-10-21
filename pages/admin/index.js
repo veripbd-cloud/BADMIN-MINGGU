@@ -6,7 +6,7 @@ import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
 
 const TEKS_SESI = 'Sesi main jam 07:00–10:00 di tanggal ini. Deadline batal otomatis: H-1 (sehari sebelumnya) jam 23:59 WIB (setelah itu batal harus lewat admin). Sesi otomatis dianggap selesai begitu lewat jam 10:00.';
-const TEKS_MEMBER = 'Buka sekali tiap bulan buat konfirmasi siapa aja yang lanjut/mau jadi member. Deadline daftar otomatis: 2 hari sejak dibuka, jam 23:59 WIB. Member yang gak daftar sampai deadline otomatis diturunkan jadi harian. Harian yang daftar & bayar lunas otomatis naik jadi member. Khusus bulan Des/Mar/Jun/Sep, sistem juga otomatis hitung subsidi 3-bulan begitu deadline lewat — pastiin "Biaya bola bulan ini" di Pengaturan udah diisi dulu sebelum buka sesi bulan itu.';
+const TEKS_MEMBER = 'Buka sekali tiap bulan buat konfirmasi siapa aja yang lanjut/mau jadi member. Deadline daftar otomatis: 2 hari sejak dibuka, jam 23:59 WIB. Member yang gak daftar sampai deadline otomatis diturunkan jadi harian. Harian yang daftar & bayar lunas otomatis naik jadi member. Khusus bulan Des/Mar/Jun/Sep, member yang terdaftar 3 bulan berturut-turut (termasuk bulan ini) ditagih sesuai "Harga member bulanan (Subsidi)" — isi dulu di Pengaturan sebelum buka sesi bulan itu.';
 
 function formatRibuan(v) {
   const angka = String(v || '').replace(/\D/g, '');
@@ -37,8 +37,9 @@ export default function AdminPage() {
   }, [loading, profile]);
 
   async function load() {
-    const res = await fetch('/api/admin/pengaturan');
-    const json = await res.json();
+    const token = await getAccessToken();
+    const res = await fetch('/api/admin/pengaturan', { headers: { Authorization: `Bearer ${token}` } });
+    const json = await res.json().catch(() => ({}));
     setPengaturan(json.data || {});
 
     const { data: pendingData } = await supabase.from('profiles').select('*').eq('status_approval', 'pending');
@@ -176,6 +177,8 @@ export default function AdminPage() {
             <input value={formatRibuan(pengaturan.harga_harian)} onChange={(e) => setPengaturan({ ...pengaturan, harga_harian: parseRibuan(e.target.value) })} />
             <label>Harga member bulanan (Rp)</label>
             <input value={formatRibuan(pengaturan.harga_member_bulanan)} onChange={(e) => setPengaturan({ ...pengaturan, harga_member_bulanan: parseRibuan(e.target.value) })} />
+            <label>Harga member bulanan (Subsidi) (Rp) — dipakai di bulan Des/Mar/Jun/Sep (0 = gratis)</label>
+            <input value={formatRibuan(pengaturan.harga_member_subsidi)} onChange={(e) => setPengaturan({ ...pengaturan, harga_member_subsidi: parseRibuan(e.target.value) })} />
             <label>Kuota member per sesi</label>
             <input value={pengaturan.kuota_member || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_member: e.target.value })} />
             <label>Kuota harian per sesi</label>
@@ -184,10 +187,6 @@ export default function AdminPage() {
             <input value={pengaturan.kuota_total || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_total: e.target.value })} />
             <label>Kuota guest per sesi (pemain dadakan tanpa akun)</label>
             <input value={pengaturan.kuota_guest || ''} onChange={(e) => setPengaturan({ ...pengaturan, kuota_guest: e.target.value })} />
-            <label>Biaya lapangan per bulan (Rp)</label>
-            <input value={formatRibuan(pengaturan.biaya_lapangan_bulanan)} onChange={(e) => setPengaturan({ ...pengaturan, biaya_lapangan_bulanan: parseRibuan(e.target.value) })} />
-            <label>Biaya bola bulan ini (Rp) — isi sebelum buka sesi Des/Mar/Jun/Sep</label>
-            <input value={formatRibuan(pengaturan.biaya_bola_bulan_ini)} onChange={(e) => setPengaturan({ ...pengaturan, biaya_bola_bulan_ini: parseRibuan(e.target.value) })} />
             <div className="form-actions"><button type="submit">Simpan Pengaturan</button></div>
           </form>
         )}
