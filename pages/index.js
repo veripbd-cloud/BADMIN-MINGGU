@@ -50,8 +50,7 @@ export default function Home() {
           .from('pendaftaran_sesi')
           .select('sesi_id')
           .in('sesi_id', sesiIds)
-          .eq('status_daftar', 'terdaftar')
-          .eq('tipe_slot', profile.tipe);
+          .eq('status_daftar', 'terdaftar');
         const countMap = {};
         (terdaftarSemua || []).forEach((row) => {
           countMap[row.sesi_id] = (countMap[row.sesi_id] || 0) + 1;
@@ -197,9 +196,8 @@ export default function Home() {
         const lewatDeadline = new Date() > new Date(sesi.deadline_batal);
         const berakhir = sudahBerakhir(sesi);
 
-        const kuotaTipe = profile?.tipe === 'member' ? sesi.kuota_member : sesi.kuota_harian;
         const terisi = jumlahTerisi[sesi.id] || 0;
-        const penuh = terisi >= kuotaTipe;
+        const penuh = terisi >= sesi.kuota_total;
 
         return (
           <div className="card" key={sesi.id}>
