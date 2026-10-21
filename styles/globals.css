@@ -22,7 +22,7 @@ html, body {
   min-height: 100vh;
 }
 a { color: inherit; }
-@keyframes naikPelan { from { transform: translateY(6px); } to { transform: translateY(0); } }
+@keyframes naikPelan { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes munculPelan { from { opacity: 0; } to { opacity: 1; } }
 .wrap { max-width: 780px; margin: 0 auto; padding: 24px 20px 80px; }
 .topbar { display: flex; align-items: center; justify-content: space-between; padding-bottom: 18px; border-bottom: 1px solid #ffffff22; margin-bottom: 24px; }
@@ -35,7 +35,7 @@ nav.tabs a.active { background: var(--shuttle-yellow); color: var(--ink); font-w
 h1 { font-family: var(--font-display); font-weight: 600; font-size: 16px; margin: 0 0 4px; }
 h2 { font-family: var(--font-display); font-weight: 600; font-size: 12px; margin: 28px 0 10px; color: var(--line-white); }
 p.subtle { color: var(--muted); margin-top: 0; }
-.card { background: var(--card-bg); border: 1px solid #ffffff1a; border-radius: var(--radius); padding: 16px 18px; margin-bottom: 12px; animation: naikPelan 0.4s var(--ease) both; transition: border-color 0.25s var(--ease), background 0.25s var(--ease); }
+.card { background: var(--card-bg); border: 1px solid #ffffff1a; border-radius: var(--radius); padding: 16px 18px; margin-bottom: 12px; animation: naikPelan 0.75s var(--ease) backwards; transition: border-color 0.25s var(--ease), background 0.25s var(--ease); }
 .card:hover { border-color: #ffffff30; }
 .card-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .badge { font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid #ffffff33; color: var(--muted); white-space: nowrap; }
@@ -70,4 +70,14 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .error { color: #e8988c; font-size: 11px; margin-top: 8px; }
 .success { color: #9ed6b0; font-size: 11px; margin-top: 8px; }
 .empty { text-align: center; color: var(--muted); padding: 30px 0; font-size: 11px; }
+/* Kartu muncul berurutan, selisih tipis biar terasa mengalir (maks ~0,3 detik tambahan) */
+.wrap > .card:nth-of-type(3) { animation-delay: 0.08s; }
+.wrap > .card:nth-of-type(4) { animation-delay: 0.12s; }
+.wrap > .card:nth-of-type(5) { animation-delay: 0.16s; }
+.wrap > .card:nth-of-type(6) { animation-delay: 0.2s; }
+.wrap > .card:nth-of-type(7) { animation-delay: 0.24s; }
+.wrap > .card:nth-of-type(8) { animation-delay: 0.28s; }
+.wrap > .card:nth-of-type(9) { animation-delay: 0.32s; }
+.wrap > .card:nth-of-type(10) { animation-delay: 0.36s; }
+
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
