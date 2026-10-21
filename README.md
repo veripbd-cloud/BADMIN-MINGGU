@@ -41,8 +41,8 @@ anggota di file ini.
 - `public/` ikon tab dan gambar preview link
 
 ## Aturan bisnis (angka bisa diubah di Admin → Pengaturan)
-- **Kapasitas**: maksimal 30 orang per sesi (member + harian, satu kolam bersama).
-  **Guest tidak dihitung** di 30; jumlahnya dibatasi `kuota_guest`.
+- **Kapasitas**: maksimal 30 orang per sesi (member + harian + guest, satu kolam bersama = 4 lapangan).
+  `kuota_guest` hanyalah batas tambahan khusus guest.
 - **Member otomatis terdaftar** di setiap sesi mingguan baru. Member yang tidak bisa main wajib
   menekan **Batal**; slotnya otomatis naik ke antrean harian paling depan.
 - **Batal oleh pemain**: boleh sampai H-1 pukul 23:59 WIB. Setelahnya hanya admin ("Cancel").
@@ -56,9 +56,10 @@ anggota di file ini.
 - **Konfirmasi Member Bulanan** (Admin → Buat Baru): pemain mendaftar → muncul outstanding iuran
   member. Deadline otomatis 2 hari sejak dibuka, pukul 23:59 WIB. Harian yang daftar dan lunas
   otomatis menjadi member; member yang tidak daftar diturunkan menjadi harian.
-- **Subsidi** dihitung hanya di bulan terakhir kuartal tetap (Des, Mar, Jun, Sep) untuk member
-  yang terdaftar tiga bulan berturut-turut. Sebelum membuka sesi bulan itu, isi
-  "Biaya bola bulan ini" di Pengaturan.
+- **Harga subsidi**: di bulan terakhir kuartal tetap (Des, Mar, Jun, Sep), member yang terdaftar
+  tiga bulan berturut-turut (bulan itu + dua bulan sebelumnya dalam kuartal yang sama; riwayat diambil
+  dari tabel `pendaftaran_member_bulanan`) ditagih sebesar `harga_member_subsidi`. Isi dulu di
+  Pengaturan sebelum membuka sesi bulan itu. Nilai 0 = gratis (tidak ada tagihan).
 - **Stok shuttlecock**: tambah stok (beli) atau set sisa stok hasil hitung fisik; sistem menghitung selisih terpakai.
 
 ## Database (Supabase)
@@ -70,7 +71,8 @@ Urutan SQL (jalankan di Supabase → SQL Editor, sekali saja per file):
 1. `schema.sql`
 2. `migrasi_guest.sql`, `migrasi_live_rotasi.sql`, `migrasi_stok_log.sql`
 3. `migrasi_outstanding_guest.sql`, `migrasi_member_bulanan.sql`
-4. `migrasi_subsidi_sync_brand.sql` (setting biaya bola, nama brand, pengaturan hanya-baca dari browser)
+4. `migrasi_subsidi_sync_brand.sql` (nama brand, pengaturan hanya-baca dari browser) dan
+   `migrasi_perbaikan_okt.sql` (penanda sesi konfirmasi member yang sudah diproses)
 5. **Keamanan**: `migrasi_lock_profiles.sql` dan `migrasi_lock_pendaftaran.sql`
 6. `cek_status_database.sql` → jalankan untuk memastikan langkah 5 benar-benar terpasang
 
@@ -85,7 +87,10 @@ normal (yang kedua menghapus seluruh riwayat sesi/kas — hati-hati).
    Error `Module not found` hampir selalu berarti file berada di folder yang salah.
 
 ## Hal yang perlu diingat saat operasional
-- Proses otomatis setelah deadline konfirmasi member (penurunan status, subsidi) berjalan saat admin
-  **membuka halaman peserta konfirmasi member terbaru**. Buka halaman itu setelah deadline dan
-  **sebelum** membuat sesi mingguan baru. Hindari membuka halaman konfirmasi bulan-bulan lama.
-- Proses otomatis "tidak hadir" untuk harian/guest berjalan saat admin membuka halaman sesi yang sudah lewat jam 10:00.
+- Penurunan status member yang tidak konfirmasi diproses **sekali saja per bulan**, otomatis saat admin
+  membuat sesi baru (mingguan atau konfirmasi bulanan) atau membuka halaman peserta bulan itu setelah
+  deadline. Halaman bulan-bulan lama hanya untuk melihat, tidak mengubah apa pun. Sesi mingguan yang
+  sudah terlanjur dibuat sebelum proses ini tidak ikut berubah (pakai Cancel untuk satu per satu).
+- Pencatatan otomatis "tidak hadir" (dan tagihan) untuk harian/guest berjalan saat admin membuka halaman
+  sesi setelah jam 10:00, hanya sampai 3 hari setelah sesi. Tetap tandai Hadir/Tidak Hadir langsung di lokasi.
+- Akun super admin hanya bisa diubah oleh super admin.
