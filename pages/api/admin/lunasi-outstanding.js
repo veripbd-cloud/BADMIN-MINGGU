@@ -37,7 +37,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, sudahLunasSebelumnya: true });
   }
 
-  await supabaseAdmin.from('transaksi_kas').insert({
+  const { error: errKas } = await supabaseAdmin.from('transaksi_kas').insert({
     jenis: 'pemasukan',
     kategori: 'pelunasan_outstanding',
     nominal: outstanding.nominal,
@@ -46,6 +46,13 @@ export default async function handler(req, res) {
     nama_guest: outstanding.nama_guest || null,
     input_by: profile.id,
   });
+
+  if (errKas) {
+    // Gagal catat ke kas -> batalkan status lunas supaya saldo kas dan outstanding tetap cocok
+    await supabaseAdmin.from('outstanding')
+      .update({ status: 'belum_lunas', tanggal_lunas: null }).eq('id', outstanding_id);
+    return res.status(500).json({ error: 'Gagal mencatat ke kas, status lunas dibatalkan: ' + errKas.message });
+  }
 
   // Kalau ini pelunasan iuran member bulanan DAN orangnya masih tercatat "harian" di
   // profil, otomatis upgrade jadi "member" + set tanggal_daftar ke awal bulan itu

@@ -9,6 +9,13 @@ export default async function handler(req, res) {
   const { player_id, nama, tanggal_daftar, tipe, level_self, level_final, email, password } = req.body;
   if (!player_id) return res.status(400).json({ error: 'player_id wajib diisi' });
 
+  // Akun super admin cuma boleh diubah oleh super admin (admin biasa tidak boleh)
+  const { data: target } = await supabaseAdmin.from('profiles').select('role').eq('id', player_id).maybeSingle();
+  if (!target) return res.status(404).json({ error: 'User tidak ditemukan' });
+  if (target.role === 'super_admin' && profile.role !== 'super_admin') {
+    return res.status(403).json({ error: 'Akun super admin hanya bisa diubah oleh super admin.' });
+  }
+
   // --- Update kolom di tabel profiles (kalau ada yang dikirim) ---
   const updateProfil = {};
   if (nama !== undefined && nama !== '') updateProfil.nama = nama;

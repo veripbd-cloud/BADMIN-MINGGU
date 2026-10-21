@@ -1,6 +1,5 @@
 import { supabaseAdmin, getProfileFromRequest, isAdmin } from '../../../lib/supabaseAdmin';
-
-const BULAN_KUARTAL_AKHIR = [12, 3, 6, 9];
+import { BULAN_KUARTAL_AKHIR, prosesSesiTertunggak } from '../../../lib/memberBulanan';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -11,16 +10,20 @@ export default async function handler(req, res) {
   const { bulan, tahun, label } = req.body;
   if (!bulan || !tahun) return res.status(400).json({ error: 'bulan & tahun wajib diisi' });
 
+  // Bulan subsidi (Des/Mar/Jun/Sep): harga subsidi wajib sudah diisi di Pengaturan (0 = gratis, boleh)
   if (BULAN_KUARTAL_AKHIR.includes(parseInt(bulan, 10))) {
-    const { data: biayaBolaSetting } = await supabaseAdmin
-      .from('pengaturan').select('value').eq('key', 'biaya_bola_bulan_ini').maybeSingle();
-    const biayaBola = parseInt(biayaBolaSetting?.value || '0', 10);
-    if (!biayaBola || biayaBola <= 0) {
+    const { data: setting } = await supabaseAdmin
+      .from('pengaturan').select('value').eq('key', 'harga_member_subsidi').maybeSingle();
+    const nilai = setting?.value;
+    if (nilai === undefined || nilai === null || String(nilai).trim() === '') {
       return res.status(400).json({
-        error: 'Bulan ini adalah bulan penghitungan subsidi (Des/Mar/Jun/Sep). Isi dulu "Biaya bola bulan ini" di Pengaturan Harga, Kuota & Nama Brand sebelum buka sesi ini.',
+        error: 'Bulan ini adalah bulan subsidi (Des/Mar/Jun/Sep). Isi dulu "Harga member bulanan (Subsidi) (Rp)" di Pengaturan Harga, Kuota & Nama Brand sebelum buka sesi ini.',
       });
     }
   }
+
+  // Rapikan status member dari konfirmasi bulan sebelumnya (kalau belum diproses)
+  await prosesSesiTertunggak();
 
   const sekarang = new Date();
   const duaHariLagi = new Date(sekarang.getTime() + 2 * 24 * 60 * 60 * 1000);

@@ -20,6 +20,10 @@ export default async function handler(req, res) {
   const sudahLewat = new Date() > new Date(sesi.tanggal + 'T10:00:00+07:00');
   if (!sudahLewat) return res.status(200).json({ ok: true, diproses: 0 });
 
+  // Cuma berlaku sampai 3 hari setelah sesi. Membuka sesi lama tidak memunculkan tagihan baru.
+  const batasAkhir = new Date(sesi.tanggal + 'T10:00:00+07:00').getTime() + 3 * 24 * 60 * 60 * 1000;
+  if (Date.now() > batasAkhir) return res.status(200).json({ ok: true, diproses: 0, alasan: 'sesi sudah lama' });
+
   const { data: belumDitandai } = await supabaseAdmin
     .from('pendaftaran_sesi')
     .select('*')

@@ -1,10 +1,15 @@
 import { supabaseAdmin, getProfileFromRequest, isAdmin } from '../../../lib/supabaseAdmin';
+import { prosesSesiTertunggak } from '../../../lib/memberBulanan';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
   const profile = await getProfileFromRequest(req);
   if (!isAdmin(profile)) return res.status(403).json({ error: 'Khusus admin' });
+
+  // Pastikan status member sudah rapi (yang tidak konfirmasi bulan ini sudah jadi harian)
+  // SEBELUM auto-join, supaya cuma member aktif yang otomatis masuk sesi.
+  await prosesSesiTertunggak();
 
   const { tanggal, label, kuota_total, kuota_member, kuota_harian, deadline_batal } = req.body;
   if (!tanggal || !deadline_batal) {
@@ -43,7 +48,11 @@ export default async function handler(req, res) {
       status_daftar: 'terdaftar',
       waktu_daftar: new Date().toISOString(),
     }));
-    await supabaseAdmin.from('pendaftaran_sesi').insert(rows);
+    const { error: errJoin } = await supabaseAdmin.from('pendaftaran_sesi').insert(rows);
+    if (errJoin) {
+      await supabaseAdmin.from('sesi').delete().eq('id', data.id);
+      return res.status(500).json({ error: 'Gagal mendaftarkan member otomatis, sesi dibatalkan: ' + errJoin.message });
+    }
   }
 
   return res.status(200).json({ data, jumlah_member_auto_join: semuaMember?.length || 0 });
