@@ -82,6 +82,7 @@ export default function DetailSesi() {
 
   const totalMemberSesi = terdaftarMember.length + batalMember.length;
   const totalHarianGuest = terdaftarHarian.length + terdaftarGuest.length;
+  const totalTerisi = terdaftarMember.length + totalHarianGuest;
 
   const antrianMenunggu = semuaTerdaftar
     .filter((p) => p.waktu_checkin && p.status_main !== 'main')
@@ -187,7 +188,7 @@ export default function DetailSesi() {
       <p className="subtle">
         Deadline batal: {new Date(sesi.deadline_batal).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB
         {' · '}Terdaftar: {terdaftarMember.length} member / {totalHarianGuest} harian & guest
-        <span style={{ fontSize: 10 }}> (maks 30 org, guest di luar itu)</span>
+        <span style={{ fontSize: 10 }}> (total {totalTerisi}/{sesi.kuota_total})</span>
       </p>
       {sesiBerakhir && <p className="badge done" style={{ display: 'inline-block', marginBottom: 10 }}>Sesi sudah berakhir (lewat jam 10:00) — kontrol admin dikunci</p>}
       {msg && <p className="error">{msg}</p>}
@@ -200,7 +201,7 @@ export default function DetailSesi() {
       )}
 
       <HeaderCollapse terbuka={bukaHarian} onToggle={() => setBukaHarian(!bukaHarian)}>
-        Terdaftar — Harian ({terdaftarHarian.length}/{sesi.kuota_harian})
+        Terdaftar — Harian ({terdaftarHarian.length})
       </HeaderCollapse>
       {bukaHarian && (
         <ListPeserta items={terdaftarHarian} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} onRalat={ralatHadir} />
