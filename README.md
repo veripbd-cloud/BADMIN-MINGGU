@@ -33,9 +33,9 @@ anggota di file ini.
   `kas.js` (Kas & Shuttlecock), `profile.js`, `admin/index.js`, `admin/users.js`,
   `member-bulanan/[id].js` (peserta konfirmasi member), `login.js`, `register.js`, `reset-password.js`
 - `pages/api/` endpoint server. Folder `api/admin/` hanya untuk admin (semua mengecek peran).
-  Endpoint pemain: `daftar-sesi`, `batal-sesi`, `daftar-member-bulanan`, `batal-member-bulanan`, `brand`.
+  Endpoint pemain: `daftar-sesi`, `batal-sesi`, `daftar-member-bulanan`, `batal-member-bulanan`, `brand`, `manifest` (agar bisa dipasang di layar HP).
 - `lib/` `supabaseClient.js` (browser), `supabaseAdmin.js` (server), `useAuth.js` (sesi login)
-- `components/TopBar.js` navbar + nama brand
+- `components/TopBar.js` navbar + nama brand; `components/Toast.js` pemberitahuan kecil
 - `styles/globals.css` seluruh tampilan
 - `supabase/` skema & migrasi SQL (lihat bagian Database)
 - `public/` ikon tab dan gambar preview link
