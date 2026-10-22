@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../lib/useAuth';
 import TopBar from '../components/TopBar';
+import { tampilToast } from '../components/Toast';
 
 function hitungTenure(profile) {
   const sumber = profile.member_sejak || profile.tanggal_daftar;
@@ -80,6 +81,7 @@ export default function Profile() {
     setMenyimpan(false);
     if (error) { setSimpanMsg('Gagal ganti nama: ' + error.message); return; }
     setNamaTampil(namaBaru.trim());
+    tampilToast('Nama diperbarui ✓');
     setModeEdit(false);
   }
 

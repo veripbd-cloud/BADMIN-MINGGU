@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import ToastHost from '../components/Toast';
 import '../styles/globals.css';
 
 const SITE_URL = 'https://badmin-minggu.vercel.app';
@@ -11,6 +12,13 @@ export default function App({ Component, pageProps }) {
       <Head>
         <title>{JUDUL}</title>
         <meta name="description" content={DESKRIPSI} />
+
+        {/* Bisa dipasang di layar HP seperti aplikasi */}
+        <link rel="manifest" href="/api/manifest" />
+        <meta name="theme-color" content="#10261d" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black" />
 
         {/* Ikon tab browser (?v=2 biar browser ambil yang baru, bukan ikon bola dunia lama) */}
         <link rel="icon" href="/favicon.ico?v=2" sizes="any" />
@@ -32,6 +40,7 @@ export default function App({ Component, pageProps }) {
         <meta name="twitter:image" content={`${SITE_URL}/og-thumb.png`} />
       </Head>
       <Component {...pageProps} />
+      <ToastHost />
     </>
   );
 }

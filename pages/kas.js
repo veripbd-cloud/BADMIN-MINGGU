@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../lib/useAuth';
 import TopBar from '../components/TopBar';
+import { tampilToast } from '../components/Toast';
 
 function formatRibuan(v) {
   const angka = String(v || '').replace(/\D/g, '');
@@ -91,6 +92,7 @@ export default function Kas() {
     const json = await res.json();
     if (!res.ok) { setMsg(json.error); return; }
     setForm({ jenis: 'pengeluaran', kategori: 'bola', nominal: '', keterangan: '' });
+    tampilToast('Transaksi tersimpan ✓');
     load();
   }
 
@@ -110,7 +112,8 @@ export default function Kas() {
         setMsg(`Gagal tandai lunas: ${json.error || 'terjadi kesalahan, coba lagi.'}`);
         return;
       }
-      await load();
+      tampilToast('Ditandai lunas ✓');
+    await load();
     } finally {
       setProcessingId(null);
     }
@@ -128,6 +131,7 @@ export default function Kas() {
     const json = await res.json();
     if (!res.ok) { setMsg(json.error); return; }
     setStokForm({ arah: 'tambah', slop: '', piece: '' });
+    tampilToast('Stok diperbarui ✓');
     load();
   }
 

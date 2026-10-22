@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../lib/useAuth';
 import TopBar from '../components/TopBar';
+import { tampilToast } from '../components/Toast';
 
 const NAMA_BULAN = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 const PER_HALAMAN = 5;
@@ -100,6 +101,7 @@ export default function Home() {
     const json = await res.json();
     setBusySesi(null);
     if (!res.ok) { setMsgSesi(json.error); return; }
+    tampilToast(json && json.data && json.data.status_daftar === 'waiting_list' ? 'Masuk waiting list ✓' : 'Berhasil daftar ✓');
     await loadSesi();
   }
 
@@ -115,6 +117,7 @@ export default function Home() {
     const json = await res.json();
     setBusySesi(null);
     if (!res.ok) { setMsgSesi(json.error); return; }
+    tampilToast('Pendaftaran dibatalkan ✓');
     await loadSesi();
   }
 
@@ -130,6 +133,7 @@ export default function Home() {
     const json = await res.json();
     setBusyMember(null);
     if (!res.ok) { setMsgMember(json.error); return; }
+    tampilToast('Berhasil daftar ✓');
     await loadMemberBulanan();
   }
 
@@ -145,6 +149,7 @@ export default function Home() {
     const json = await res.json();
     setBusyMember(null);
     if (!res.ok) { setMsgMember(json.error); return; }
+    tampilToast('Pendaftaran dibatalkan ✓');
     await loadMemberBulanan();
   }
 
