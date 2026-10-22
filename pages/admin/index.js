@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
+import { tampilToast } from '../../components/Toast';
 
 const TEKS_SESI = 'Sesi main jam 07:00–10:00 di tanggal ini. Deadline batal otomatis: H-1 (sehari sebelumnya) jam 23:59 WIB (setelah itu batal harus lewat admin). Sesi otomatis dianggap selesai begitu lewat jam 10:00.';
 const TEKS_MEMBER = 'Buka sekali tiap bulan buat konfirmasi siapa aja yang lanjut/mau jadi member. Deadline daftar otomatis: 2 hari sejak dibuka, jam 23:59 WIB. Member yang gak daftar sampai deadline otomatis diturunkan jadi harian. Harian yang daftar & bayar lunas otomatis naik jadi member. Khusus bulan Des/Mar/Jun/Sep, member yang terdaftar 3 bulan berturut-turut (termasuk bulan ini) ditagih sesuai "Harga member bulanan (Subsidi)" — isi dulu di Pengaturan sebelum buka sesi bulan itu.';
@@ -30,7 +31,11 @@ export default function AdminPage() {
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
-  function tampilPesan(teks, error = false) { setPesan({ teks, error }); }
+  // Sukses -> pemberitahuan kecil. Error -> tetap tampil sebagai teks merah + pemberitahuan.
+  function tampilPesan(teks, error = false) {
+    setPesan({ teks: error ? teks : '', error });
+    if (teks) tampilToast(teks, error ? 'error' : 'ok');
+  }
 
   useEffect(() => {
     if (!loading && profile && !isAdmin) router.push('/');
