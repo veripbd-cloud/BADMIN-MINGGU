@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
+import { tampilToast } from '../../components/Toast';
 
 const NAMA_BULAN = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
@@ -16,6 +17,9 @@ export default function DetailMemberBulanan() {
   const [outstandingMap, setOutstandingMap] = useState({});
   const [hasilProses, setHasilProses] = useState(null);
   const [msg, setMsg] = useState('');
+  const [calon, setCalon] = useState([]);
+  const [calonId, setCalonId] = useState('');
+  const [menambah, setMenambah] = useState(false);
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
@@ -44,6 +48,13 @@ export default function DetailMemberBulanan() {
       .order('waktu_daftar', { ascending: true });
     setPendaftaran(pendaftaranData || []);
 
+    if (isAdmin) {
+      const { data: semua } = await supabase
+        .from('profiles').select('id, nama, tipe').eq('status_approval', 'approved').order('nama');
+      const sudah = new Set((pendaftaranData || []).map((p) => p.player_id));
+      setCalon((semua || []).filter((u) => !sudah.has(u.id)));
+    }
+
     const ids = (pendaftaranData || []).map((p) => p.player_id);
     if (ids.length) {
       const { data: profilesData } = await supabase.from('profiles').select('*').in('id', ids);
@@ -58,6 +69,29 @@ export default function DetailMemberBulanan() {
       (outstandingData || []).forEach((o) => { oMap[o.referensi_id] = o; });
       setOutstandingMap(oMap);
     }
+  }
+
+  async function tambahPeserta() {
+    if (!calonId) return;
+    setMenambah(true);
+    setMsg('');
+    const token = await getAccessToken();
+    const res = await fetch('/api/admin/tambah-peserta-member', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ sesi_member_bulanan_id: id, player_id: calonId }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setMenambah(false);
+    if (!res.ok) {
+      const pesan = json.error || `Gagal menambah peserta (kode ${res.status})`;
+      setMsg(pesan);
+      tampilToast(pesan, 'error');
+      return;
+    }
+    setCalonId('');
+    tampilToast('Peserta ditambahkan ✓');
+    load();
   }
 
   useEffect(() => { load(); }, [id, isAdmin]);
@@ -81,6 +115,25 @@ export default function DetailMemberBulanan() {
         <p className="subtle" style={{ fontSize: 11 }}>
           Sesi ini sudah diproses sebelumnya, jadi halaman ini hanya untuk melihat daftar peserta.
         </p>
+      )}
+
+      {isAdmin && (
+        <div className="card">
+          <p style={{ margin: '0 0 6px', fontWeight: 600 }}>Tambah peserta</p>
+          <p className="subtle" style={{ fontSize: 11, marginTop: 0 }}>
+            Buat yang telat daftar (admin tetap boleh walau deadline sudah lewat). Tagihan iuran otomatis
+            muncul di Kas; tandai lunas di sana (harian otomatis naik jadi member).
+          </p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select value={calonId} onChange={(e) => setCalonId(e.target.value)} style={{ flex: 1 }}>
+              <option value="">Pilih pemain...</option>
+              {calon.map((u) => (
+                <option key={u.id} value={u.id}>{u.nama} ({u.tipe === 'member' ? 'member' : 'harian'})</option>
+              ))}
+            </select>
+            <button disabled={!calonId || menambah} onClick={tambahPeserta}>{menambah ? '...' : 'Tambah'}</button>
+          </div>
+        </div>
       )}
 
       <h2>Daftar Peserta</h2>
