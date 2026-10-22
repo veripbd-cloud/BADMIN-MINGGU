@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
+import { tampilToast } from '../../components/Toast';
 
 const DAFTAR_LAPANGAN = ['A6', 'A7', 'A9', 'A10'];
 
@@ -34,6 +35,7 @@ export default function DetailSesi() {
   const [bukaHarian, setBukaHarian] = useState(false);
   const [bukaGuest, setBukaGuest] = useState(false);
   const [bukaAntrian, setBukaAntrian] = useState(false);
+  const [barSiap, setBarSiap] = useState(false);
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
@@ -72,6 +74,13 @@ export default function DetailSesi() {
 
   useEffect(() => { load(); }, [id, isAdmin]);
 
+  // Bar kapasitas "mengisi" pelan-pelan sekali saat halaman pertama tampil
+  useEffect(() => {
+    if (!sesi) return undefined;
+    const t = setTimeout(() => setBarSiap(true), 60);
+    return () => clearTimeout(t);
+  }, [sesi]);
+
   const terdaftarMember = semuaPendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'member');
   const terdaftarHarian = semuaPendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'harian');
   const terdaftarGuest = semuaPendaftaran.filter((p) => p.status_daftar === 'terdaftar' && p.tipe_slot === 'guest');
@@ -97,7 +106,7 @@ export default function DetailSesi() {
     return semuaTerdaftar.filter((p) => p.status_main === 'main' && p.lapangan_sekarang === kodeLapangan);
   }
 
-  async function apiCall(url, body) {
+  async function apiCall(url, body, pesanSukses) {
     const token = await getAccessToken();
     const res = await fetch(url, {
       method: 'POST',
@@ -105,35 +114,41 @@ export default function DetailSesi() {
       body: JSON.stringify(body),
     });
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) setMsg(json.error || `Gagal (kode ${res.status})`);
+    if (!res.ok) {
+      const pesan = json.error || `Gagal (kode ${res.status})`;
+      setMsg(pesan);
+      tampilToast(pesan, 'error');
+    } else if (pesanSukses) {
+      tampilToast(pesanSukses);
+    }
     return { ok: res.ok, json };
   }
 
   async function tandaiHadir(pendaftaran_id, status_hadir) {
-    await apiCall('/api/admin/tandai-hadir', { pendaftaran_id, status_hadir });
+    await apiCall('/api/admin/tandai-hadir', { pendaftaran_id, status_hadir }, status_hadir === 'no_show' ? 'Ditandai tidak hadir ✓' : 'Ditandai hadir ✓');
     load();
   }
 
   async function hadirGabungan(pendaftaran_id) {
     await apiCall('/api/admin/checkin', { pendaftaran_id });
-    await apiCall('/api/admin/tandai-hadir', { pendaftaran_id, status_hadir: 'hadir' });
+    await apiCall('/api/admin/tandai-hadir', { pendaftaran_id, status_hadir: 'hadir' }, 'Hadir ✓');
     load();
   }
 
   async function ralatHadir(pendaftaran_id) {
     if (!confirm('Ralat status hadir/tidak-hadir ini? Outstanding yang belum dibayar (kalau ada) akan ikut dihapus.')) return;
-    await apiCall('/api/admin/ralat-hadir', { pendaftaran_id });
+    await apiCall('/api/admin/ralat-hadir', { pendaftaran_id }, 'Status diralat ✓');
     load();
   }
 
   async function promosikan(pendaftaran_id) {
-    await apiCall('/api/admin/promosikan-manual', { pendaftaran_id });
+    await apiCall('/api/admin/promosikan-manual', { pendaftaran_id }, 'Dinaikkan dari waiting list ✓');
     load();
   }
 
   async function batalkanAdmin(pendaftaran_id) {
     if (!confirm('Batalkan pendaftaran ini? Slot akan otomatis coba dikasih ke waiting list tipe yang sama dulu.')) return;
-    await apiCall('/api/admin/batalkan-pendaftaran', { pendaftaran_id });
+    await apiCall('/api/admin/batalkan-pendaftaran', { pendaftaran_id }, 'Pendaftaran dibatalkan ✓');
     load();
   }
 
@@ -141,7 +156,7 @@ export default function DetailSesi() {
     e.preventDefault();
     if (!namaGuestBaru.trim()) return;
     setMsg('');
-    const hasil = await apiCall('/api/admin/tambah-guest', { sesi_id: id, nama_guest: namaGuestBaru.trim() });
+    const hasil = await apiCall('/api/admin/tambah-guest', { sesi_id: id, nama_guest: namaGuestBaru.trim() }, 'Guest ditambahkan ✓');
     if (hasil.ok) setNamaGuestBaru('');
     load();
   }
@@ -158,21 +173,21 @@ export default function DetailSesi() {
     const pilihan = pilihanPerLapangan[kodeLapangan] || [];
     if (pilihan.length === 0) { setMsg('Pilih minimal 1 pemain dari antrian dulu'); return; }
     setMsg('');
-    await apiCall('/api/admin/mulai-main', { sesi_id: id, lapangan: kodeLapangan, pendaftaran_ids: pilihan });
+    await apiCall('/api/admin/mulai-main', { sesi_id: id, lapangan: kodeLapangan, pendaftaran_ids: pilihan }, 'Game dimulai ✓');
     setPilihanPerLapangan((prev) => ({ ...prev, [kodeLapangan]: [] }));
     load();
   }
 
   async function selesaiMain(kodeLapangan) {
     setMsg('');
-    await apiCall('/api/admin/selesai-main', { sesi_id: id, lapangan: kodeLapangan });
+    await apiCall('/api/admin/selesai-main', { sesi_id: id, lapangan: kodeLapangan }, 'Game selesai ✓');
     load();
   }
 
   async function batalMain(kodeLapangan) {
     if (!confirm('Batalkan? Pemain balik ke posisi antrian semula, jumlah main mereka TIDAK nambah.')) return;
     setMsg('');
-    await apiCall('/api/admin/batal-main', { sesi_id: id, lapangan: kodeLapangan });
+    await apiCall('/api/admin/batal-main', { sesi_id: id, lapangan: kodeLapangan }, 'Game dibatalkan ✓');
     load();
   }
 
@@ -180,6 +195,32 @@ export default function DetailSesi() {
 
   const sesiBerakhir = new Date() > new Date(sesi.tanggal + 'T10:00:00+07:00');
   const bisaAdminKontrol = isAdmin && !sesiBerakhir;
+
+  const slotKosong = Math.max(0, sesi.kuota_total - totalTerisi);
+  const persenTerisi = sesi.kuota_total > 0 ? Math.min(100, Math.round((totalTerisi / sesi.kuota_total) * 100)) : 0;
+  const jumlahWaiting = waitingMember.length + waitingHarian.length;
+
+  // Susun daftar pemain jadi teks rapi lalu buka WhatsApp (pilih grup/kontak di sana)
+  function bagikanWA() {
+    const hari = new Date(sesi.tanggal + 'T00:00:00+07:00').toLocaleDateString('id-ID', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta',
+    });
+    const baris = [];
+    baris.push(`*${sesi.label || sesi.tanggal}*`);
+    baris.push(`${hari} · 07.00–10.00 WIB`);
+    baris.push(`Terisi ${totalTerisi}/${sesi.kuota_total} · ${slotKosong} slot kosong`);
+    const tulis = (judul, arr) => {
+      if (arr.length === 0) return;
+      baris.push('');
+      baris.push(`*${judul} (${arr.length})*`);
+      arr.forEach((p, i) => baris.push(`${i + 1}. ${namaPeserta(p, profiles)}`));
+    };
+    tulis('Member', terdaftarMember);
+    tulis('Harian', terdaftarHarian);
+    tulis('Guest', terdaftarGuest);
+    tulis('Waiting list', [...waitingMember, ...waitingHarian]);
+    window.open('https://wa.me/?text=' + encodeURIComponent(baris.join('\n')), '_blank');
+  }
 
   return (
     <div className="wrap">
@@ -190,6 +231,24 @@ export default function DetailSesi() {
         {' · '}Terdaftar: {terdaftarMember.length} member / {totalHarianGuest} harian & guest
         <span style={{ fontSize: 10 }}> (total {totalTerisi}/{sesi.kuota_total})</span>
       </p>
+      <div style={{ margin: '4px 0 14px' }}>
+        <div style={{ height: 6, borderRadius: 999, background: '#ffffff1a', overflow: 'hidden' }}>
+          <div
+            style={{
+              height: '100%', borderRadius: 999,
+              width: `${barSiap ? persenTerisi : 0}%`,
+              background: slotKosong === 0 ? '#b5493a' : '#e8b64c',
+              transition: 'width 0.9s cubic-bezier(0.22, 0.61, 0.36, 1)',
+            }}
+          />
+        </div>
+        <div className="card-row" style={{ marginTop: 8 }}>
+          <span className="subtle" style={{ fontSize: 11 }}>
+            {totalTerisi}/{sesi.kuota_total} terisi · {slotKosong} slot kosong{jumlahWaiting > 0 ? ` · ${jumlahWaiting} waiting list` : ''}
+          </span>
+          <button className="secondary" style={{ padding: '5px 12px' }} onClick={bagikanWA}>Bagikan ke WhatsApp</button>
+        </div>
+      </div>
       {sesiBerakhir && <p className="badge done" style={{ display: 'inline-block', marginBottom: 10 }}>Sesi sudah berakhir (lewat jam 10:00) — kontrol admin dikunci</p>}
       {msg && <p className="error">{msg}</p>}
 
