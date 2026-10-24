@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
+import Memuat from '../../components/Memuat';
 
 export default function KelolaUser() {
   const router = useRouter();
@@ -58,7 +59,7 @@ export default function KelolaUser() {
     load();
   }
 
-  if (loading || !isAdmin) return null;
+  if (loading || !isAdmin) return <Memuat />;
 
   const usersTampil = users.filter((u) =>
     (u.nama || '').toLowerCase().includes(cari.toLowerCase()) ||

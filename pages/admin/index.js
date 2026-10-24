@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
+import Memuat from '../../components/Memuat';
 import { tampilToast } from '../../components/Toast';
 
 const TEKS_SESI = 'Sesi main jam 07:00–10:00 di tanggal ini. Deadline batal otomatis: H-1 (sehari sebelumnya) jam 23:59 WIB (setelah itu batal harus lewat admin). Sesi otomatis dianggap selesai begitu lewat jam 10:00.';
@@ -133,7 +134,7 @@ export default function AdminPage() {
     load();
   }
 
-  if (loading || !isAdmin) return null;
+  if (loading || !isAdmin) return <Memuat />;
 
   return (
     <div className="wrap">
