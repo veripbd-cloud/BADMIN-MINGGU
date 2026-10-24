@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../lib/useAuth';
 import TopBar from '../components/TopBar';
+import Memuat from '../components/Memuat';
 import { tampilToast } from '../components/Toast';
 
 const NAMA_BULAN = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -153,7 +154,7 @@ export default function Home() {
     await loadMemberBulanan();
   }
 
-  if (loading) return null;
+  if (loading) return <Memuat />;
 
   function sudahBerakhir(sesi) {
     const batasAkhir = new Date(sesi.tanggal + 'T10:00:00+07:00');

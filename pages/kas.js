@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../lib/useAuth';
 import TopBar from '../components/TopBar';
+import Memuat from '../components/Memuat';
 import { tampilToast } from '../components/Toast';
 
 function formatRibuan(v) {
@@ -13,9 +14,20 @@ function parseRibuan(str) {
   return String(str || '').replace(/\D/g, '');
 }
 
+function formatHari(tanggal) {
+  return new Date(tanggal + 'T00:00:00+07:00').toLocaleDateString('id-ID', {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta',
+  });
+}
+
 export default function Kas() {
   const { profile, loading } = useAuth();
-  const [transaksi, setTransaksi] = useState([]);
+  const [transaksi, setTransaksi] = useState([]); // baris yang sudah dimuat, terbaru dulu
+  const [saldo, setSaldo] = useState(0);
+  const [totalTransaksi, setTotalTransaksi] = useState(0);
+  const [adaLagi, setAdaLagi] = useState(false);
+  const [infoHari, setInfoHari] = useState({});
+  const [memuatLagi, setMemuatLagi] = useState(false);
   const [outstanding, setOutstanding] = useState([]);
   const [profilesMap, setProfilesMap] = useState({});
   const [form, setForm] = useState({ jenis: 'pengeluaran', kategori: 'bola', nominal: '', keterangan: '' });
@@ -23,25 +35,37 @@ export default function Kas() {
   const [processingId, setProcessingId] = useState(null);
   const [stokLog, setStokLog] = useState([]);
   const [stokForm, setStokForm] = useState({ arah: 'tambah', slop: '', piece: '' });
-  const [showSemuaTransaksi, setShowSemuaTransaksi] = useState(false);
   const [showSemuaStok, setShowSemuaStok] = useState(false);
   const [bukaOutstanding, setBukaOutstanding] = useState(false);
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
+  // Saldo dan riwayat dihitung di SERVER dari seluruh transaksi; halaman hanya menampilkan 30 baris per muat.
+  async function muatTransaksi(offset) {
+    const token = await getAccessToken();
+    const res = await fetch(`/api/kas?offset=${offset}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) { setMsg(json.error || `Gagal memuat kas (kode ${res.status})`); return; }
+    setSaldo(json.saldo);
+    setTotalTransaksi(json.total);
+    setAdaLagi(json.ada_lagi);
+    setInfoHari((lama) => (offset === 0 ? json.hari : { ...lama, ...json.hari }));
+    setTransaksi((lama) => (offset === 0 ? json.transaksi : [...lama, ...json.transaksi]));
+  }
+
+  async function muatLebih() {
+    setMemuatLagi(true);
+    await muatTransaksi(transaksi.length);
+    setMemuatLagi(false);
+  }
+
   async function load() {
-    // PENTING: TIDAK pakai .limit() di sini -- saldo kas dihitung dari SEMUA transaksi
-    // yang pernah ada, bukan cuma 50 terbaru. Kalau dibatasi, transaksi lama yang
-    // "kepotong" bikin saldo keliatan salah/minus begitu udah lewat 50 baris.
-    const { data: t } = await supabase.from('transaksi_kas').select('*').order('tanggal', { ascending: false }).order('created_at', { ascending: false });
-    setTransaksi(t || []);
+    await muatTransaksi(0);
 
     const { data: o } = await supabase.from('outstanding').select('*').eq('status', 'belum_lunas');
     setOutstanding(o || []);
 
-    const idsOutstanding = (o || []).map((x) => x.player_id).filter(Boolean);
-    const idsTransaksi = (t || []).map((x) => x.player_id).filter(Boolean);
-    const ids = [...new Set([...idsOutstanding, ...idsTransaksi])];
+    const ids = [...new Set((o || []).map((x) => x.player_id).filter(Boolean))];
     if (ids.length) {
       const { data: p } = await supabase.from('profiles').select('id, nama').in('id', ids);
       const map = {};
@@ -61,7 +85,7 @@ export default function Kas() {
 
   useEffect(() => { if (!loading) load(); }, [loading]);
 
-  if (loading) return null;
+  if (loading) return <Memuat />;
 
   const bolehLihatKas = profile && (profile.tipe === 'member' || isAdmin);
   if (!bolehLihatKas) {
@@ -74,8 +98,15 @@ export default function Kas() {
     );
   }
 
-  const saldo = transaksi.reduce((sum, t) => sum + (t.jenis === 'pemasukan' ? t.nominal : -t.nominal), 0);
   const totalOutstanding = outstanding.reduce((sum, o) => sum + o.nominal, 0);
+
+  // Kelompokkan baris per hari (urutan: terbaru dulu)
+  const kelompokHari = [];
+  transaksi.forEach((t) => {
+    const terakhir = kelompokHari[kelompokHari.length - 1];
+    if (terakhir && terakhir.tanggal === t.tanggal) terakhir.baris.push(t);
+    else kelompokHari.push({ tanggal: t.tanggal, baris: [t] });
+  });
   const stokPiece = stokLog.length > 0 ? stokLog[0].saldo_setelah : 0;
   const stokSlop = Math.floor(stokPiece / 12);
   const stokSisaPiece = stokPiece % 12;
@@ -281,29 +312,46 @@ export default function Kas() {
       )}
 
       <h2>Riwayat Transaksi</h2>
-      <table>
-        <thead>
-          <tr><th>Tanggal</th><th>Jenis</th><th>Nominal</th><th>Pemain</th><th>Keterangan</th></tr>
-        </thead>
-        <tbody>
-          {(showSemuaTransaksi ? transaksi : transaksi.slice(0, 5)).map((t) => (
-            <tr key={t.id}>
-              <td>{new Date(t.tanggal).toLocaleDateString('id-ID')}</td>
-              <td>{t.jenis === 'pemasukan' ? 'Debit' : 'Kredit'}</td>
-              <td style={{ color: t.jenis === 'pemasukan' ? '#9ed6b0' : '#e8988c' }}>
-                {t.jenis === 'pemasukan' ? '+' : '-'}Rp{t.nominal.toLocaleString('id-ID')}
-              </td>
-              <td>{t.player_id ? (profilesMap[t.player_id] || '-') : (t.nama_guest || '-')}</td>
-              <td>{t.keterangan || '-'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {transaksi.length > 5 && (
-        <button className="secondary" style={{ marginTop: 8 }} onClick={() => setShowSemuaTransaksi(!showSemuaTransaksi)}>
-          {showSemuaTransaksi ? 'Tampilkan 5 Terbaru' : `Lihat Semua (${transaksi.length})`}
+      <div style={{ overflowX: 'auto' }}>
+        <table>
+          <thead>
+            <tr><th>Jenis</th><th>Nominal</th><th>Pemain</th><th>Keterangan</th><th>Saldo setelah</th></tr>
+          </thead>
+          <tbody>
+            {kelompokHari.map((g) => (
+              <Fragment key={g.tanggal}>
+                <tr>
+                  <td colSpan={5} style={{ color: 'var(--muted)', fontSize: 11, paddingTop: 16 }}>
+                    <strong style={{ color: 'var(--line-white)' }}>{formatHari(g.tanggal)}</strong>
+                    {infoHari[g.tanggal] && (
+                      <> · saldo awal Rp{infoHari[g.tanggal].awal.toLocaleString('id-ID')} → akhir Rp{infoHari[g.tanggal].akhir.toLocaleString('id-ID')}</>
+                    )}
+                  </td>
+                </tr>
+                {g.baris.map((t) => (
+                  <tr key={t.id}>
+                    <td>{t.jenis === 'pemasukan' ? 'Debit' : 'Kredit'}</td>
+                    <td style={{ color: t.jenis === 'pemasukan' ? '#9ed6b0' : '#e8988c' }}>
+                      {t.jenis === 'pemasukan' ? '+' : '-'}Rp{t.nominal.toLocaleString('id-ID')}
+                    </td>
+                    <td>{t.pemain || '-'}</td>
+                    <td>{t.keterangan || '-'}</td>
+                    <td>Rp{t.saldo_setelah.toLocaleString('id-ID')}</td>
+                  </tr>
+                ))}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {adaLagi && (
+        <button className="secondary" style={{ marginTop: 10 }} disabled={memuatLagi} onClick={muatLebih}>
+          {memuatLagi ? 'Memuat...' : 'Muat 30 berikutnya'}
         </button>
       )}
+      <p className="subtle" style={{ fontSize: 11, marginTop: 8 }}>
+        Menampilkan {transaksi.length} dari {totalTransaksi} transaksi. Saldo dihitung dari semua transaksi.
+      </p>
     </div>
   );
 }

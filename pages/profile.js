@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../lib/useAuth';
 import TopBar from '../components/TopBar';
+import Memuat from '../components/Memuat';
 import { tampilToast } from '../components/Toast';
 
 function hitungTenure(profile) {
@@ -98,7 +99,7 @@ export default function Profile() {
     setModeEditEmail(false);
   }
 
-  if (loading || !profile) return null;
+  if (loading || !profile) return <Memuat />;
 
   const tombolPensil = { padding: '4px 8px', fontSize: 12, lineHeight: 1 };
 
