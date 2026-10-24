@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
+import Memuat from '../../components/Memuat';
 import { tampilToast } from '../../components/Toast';
 
 const NAMA_BULAN = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -96,7 +97,7 @@ export default function DetailMemberBulanan() {
 
   useEffect(() => { load(); }, [id, isAdmin]);
 
-  if (loading || !sesi) return null;
+  if (loading || !sesi) return <Memuat />;
 
   return (
     <div className="wrap">
