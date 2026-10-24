@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
+import Memuat from '../../components/Memuat';
 import { tampilToast } from '../../components/Toast';
 
 const DAFTAR_LAPANGAN = ['A6', 'A7', 'A9', 'A10'];
@@ -191,7 +192,7 @@ export default function DetailSesi() {
     load();
   }
 
-  if (loading || !sesi) return null;
+  if (loading || !sesi) return <Memuat />;
 
   const sesiBerakhir = new Date() > new Date(sesi.tanggal + 'T10:00:00+07:00');
   const bisaAdminKontrol = isAdmin && !sesiBerakhir;
