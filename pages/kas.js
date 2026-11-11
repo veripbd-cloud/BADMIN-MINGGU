@@ -29,7 +29,6 @@ export default function Kas() {
   const [infoHari, setInfoHari] = useState({});
   const [memuatLagi, setMemuatLagi] = useState(false);
   const [outstanding, setOutstanding] = useState([]);
-  const [profilesMap, setProfilesMap] = useState({});
   const [form, setForm] = useState({ jenis: 'pengeluaran', kategori: 'bola', nominal: '', keterangan: '' });
   const [msg, setMsg] = useState('');
   const [processingId, setProcessingId] = useState(null);
@@ -59,28 +58,19 @@ export default function Kas() {
     setMemuatLagi(false);
   }
 
+  async function muatRingkasan() {
+    const token = await getAccessToken();
+    const res = await fetch('/api/kas-ringkasan', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) { setMsg(json.error || `Gagal memuat ringkasan kas (kode ${res.status})`); return; }
+    setOutstanding(json.outstanding || []);
+    setStokLog(json.stok || []);
+  }
+
+  // Semua data kas diambil lewat server (bukan langsung dari browser)
   async function load() {
     await muatTransaksi(0);
-
-    const { data: o } = await supabase.from('outstanding').select('*').eq('status', 'belum_lunas');
-    setOutstanding(o || []);
-
-    const ids = [...new Set((o || []).map((x) => x.player_id).filter(Boolean))];
-    if (ids.length) {
-      const { data: p } = await supabase.from('profiles').select('id, nama').in('id', ids);
-      const map = {};
-      (p || []).forEach((pr) => { map[pr.id] = pr.nama; });
-      setProfilesMap(map);
-    }
-
-    // Stok shuttlecock aman dari isu yang sama -- tiap baris nyimpen saldo_setelah
-    // sendiri (dihitung server-side pas insert), jadi gak bergantung sama client
-    // nge-jumlahin dari daftar yang dibatasi. Tapi .limit() tetep dibuang biar konsisten.
-    const { data: stokData } = await supabase
-      .from('stok_shuttle_log')
-      .select('*')
-      .order('waktu', { ascending: false });
-    setStokLog(stokData || []);
+    await muatRingkasan();
   }
 
   useEffect(() => { if (!loading) load(); }, [loading]);
@@ -213,7 +203,7 @@ export default function Kas() {
         <div className="card outstanding-item" key={o.id}>
           <div className="card-row">
             <div>
-              <strong>{profilesMap[o.player_id] || o.nama_guest || '—'}</strong>
+              <strong>{o.nama || '—'}</strong>
               <div style={{ fontSize: 11, color: 'var(--muted)' }}>{o.keterangan} · Rp{o.nominal.toLocaleString('id-ID')}</div>
             </div>
             {isAdmin && (

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../lib/supabaseClient';
-import { useAuth } from '../lib/useAuth';
+import { useAuth, getAccessToken } from '../lib/useAuth';
 import TopBar from '../components/TopBar';
 import Memuat from '../components/Memuat';
 import { tampilToast } from '../components/Toast';
@@ -63,12 +63,14 @@ export default function Profile() {
         .limit(10);
       setRiwayat(r || []);
 
-      const { data: o } = await supabase
-        .from('outstanding')
-        .select('*')
-        .eq('player_id', profile.id)
-        .eq('status', 'belum_lunas');
-      setOutstanding(o || []);
+      try {
+        const token = await getAccessToken();
+        const resO = await fetch('/api/outstanding-saya', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+        const jsonO = await resO.json().catch(() => ({}));
+        setOutstanding(resO.ok ? (jsonO.outstanding || []) : []);
+      } catch (e) {
+        setOutstanding([]);
+      }
     }
     load();
   }, [profile]);
