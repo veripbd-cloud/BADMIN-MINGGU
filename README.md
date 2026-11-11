@@ -33,7 +33,7 @@ anggota di file ini.
   `kas.js` (Kas & Shuttlecock), `profile.js`, `admin/index.js`, `admin/users.js`,
   `member-bulanan/[id].js` (peserta konfirmasi member), `login.js`, `register.js`, `reset-password.js`
 - `pages/api/` endpoint server. Folder `api/admin/` hanya untuk admin (semua mengecek peran).
-  Endpoint pemain: `daftar-sesi`, `batal-sesi`, `daftar-member-bulanan`, `batal-member-bulanan`, `brand`, `manifest` (agar bisa dipasang di layar HP).
+  Endpoint pemain: `daftar-sesi`, `batal-sesi`, `daftar-member-bulanan`, `batal-member-bulanan`, `brand`, `manifest` (agar bisa dipasang di layar HP), `kas`, `kas-ringkasan`, `outstanding-saya`.
 - `lib/` `supabaseClient.js` (browser), `supabaseAdmin.js` (server), `useAuth.js` (sesi login)
 - `components/TopBar.js` navbar + nama brand; `components/Toast.js` pemberitahuan kecil
 - `styles/globals.css` seluruh tampilan
@@ -75,6 +75,7 @@ Urutan SQL (jalankan di Supabase → SQL Editor, sekali saja per file):
    `migrasi_perbaikan_okt.sql` (penanda sesi konfirmasi member yang sudah diproses)
 5. **Keamanan**: `migrasi_lock_profiles.sql` dan `migrasi_lock_pendaftaran.sql`
 6. `cek_status_database.sql` → jalankan untuk memastikan langkah 5 benar-benar terpasang
+7. `tutup_baca_langsung.sql` (opsional, setelah Kas, Profil, dan halaman peserta konfirmasi dicek normal)
 
 Catatan: `schema.sql` adalah skema awal dan tidak mencerminkan semua perubahan; sebagian perubahan
 dilakukan lewat migrasi. `migrasi_member_sejak.sql` dan `bersihkan_histori.sql` bukan bagian setup
