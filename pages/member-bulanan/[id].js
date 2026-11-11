@@ -63,12 +63,17 @@ export default function DetailMemberBulanan() {
       (profilesData || []).forEach((pr) => { map[pr.id] = pr; });
       setProfiles(map);
 
-      const { data: outstandingData } = await supabase
-        .from('outstanding').select('*')
-        .eq('sumber', 'tagihan_bulanan_member').in('referensi_id', (pendaftaranData || []).map((p) => p.id));
-      const oMap = {};
-      (outstandingData || []).forEach((o) => { oMap[o.referensi_id] = o; });
-      setOutstandingMap(oMap);
+      // Status tagihan hanya untuk admin, diambil lewat server
+      if (isAdmin) {
+        const token = await getAccessToken();
+        const resO = await fetch(`/api/admin/outstanding-member-bulanan?sesi_member_bulanan_id=${id}`, {
+          headers: { Authorization: `Bearer ${token}` }, cache: 'no-store',
+        });
+        const jsonO = await resO.json().catch(() => ({}));
+        const oMap = {};
+        (jsonO.outstanding || []).forEach((o) => { oMap[o.referensi_id] = o; });
+        setOutstandingMap(oMap);
+      }
     }
   }
 
@@ -150,7 +155,7 @@ export default function DetailMemberBulanan() {
                 {profiles[p.player_id]?.nama || '—'}
                 {o && <span className="subtle" style={{ fontSize: 11 }}> · Rp{o.nominal.toLocaleString('id-ID')}</span>}
               </span>
-              <span className={`badge ${kelas}`}>{label}</span>
+              {isAdmin && <span className={`badge ${kelas}`}>{label}</span>}
             </div>
           </div>
         );
