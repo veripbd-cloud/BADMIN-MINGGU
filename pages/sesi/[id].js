@@ -5,6 +5,7 @@ import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
 import Memuat from '../../components/Memuat';
 import { tampilToast } from '../../components/Toast';
+import { kelompokkanPeserta, bisaDiaksi, jalankanBerbatas } from '../../lib/aksiPeserta';
 
 const DAFTAR_LAPANGAN = ['A6', 'A7', 'A9', 'A10'];
 
@@ -37,6 +38,7 @@ export default function DetailSesi() {
   const [bukaGuest, setBukaGuest] = useState(false);
   const [bukaAntrian, setBukaAntrian] = useState(false);
   const [barSiap, setBarSiap] = useState(false);
+  const [memproses, setMemproses] = useState(false);
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
@@ -98,11 +100,6 @@ export default function DetailSesi() {
     .filter((p) => p.waktu_checkin && p.status_main !== 'main')
     .sort((a, b) => new Date(a.waktu_checkin) - new Date(b.waktu_checkin));
 
-  // Yang masih perlu ditandai di atas, yang sudah "Tidak Hadir" di bawah
-  const belumCheckin = semuaTerdaftar
-    .filter((p) => !p.waktu_checkin)
-    .sort((a, b) => (a.status_hadir === 'no_show') - (b.status_hadir === 'no_show'));
-
   function pemainDiLapangan(kodeLapangan) {
     return semuaTerdaftar.filter((p) => p.status_main === 'main' && p.lapangan_sekarang === kodeLapangan);
   }
@@ -125,31 +122,8 @@ export default function DetailSesi() {
     return { ok: res.ok, json };
   }
 
-  async function tandaiHadir(pendaftaran_id, status_hadir) {
-    await apiCall('/api/admin/tandai-hadir', { pendaftaran_id, status_hadir }, status_hadir === 'no_show' ? 'Ditandai tidak hadir ✓' : 'Ditandai hadir ✓');
-    load();
-  }
-
-  async function hadirGabungan(pendaftaran_id) {
-    await apiCall('/api/admin/checkin', { pendaftaran_id });
-    await apiCall('/api/admin/tandai-hadir', { pendaftaran_id, status_hadir: 'hadir' }, 'Hadir ✓');
-    load();
-  }
-
-  async function ralatHadir(pendaftaran_id) {
-    if (!confirm('Ralat status hadir/tidak-hadir ini? Outstanding yang belum dibayar (kalau ada) akan ikut dihapus.')) return;
-    await apiCall('/api/admin/ralat-hadir', { pendaftaran_id }, 'Status diralat ✓');
-    load();
-  }
-
   async function promosikan(pendaftaran_id) {
     await apiCall('/api/admin/promosikan-manual', { pendaftaran_id }, 'Dinaikkan dari waiting list ✓');
-    load();
-  }
-
-  async function batalkanAdmin(pendaftaran_id) {
-    if (!confirm('Batalkan pendaftaran ini? Slot akan otomatis coba dikasih ke waiting list tipe yang sama dulu.')) return;
-    await apiCall('/api/admin/batalkan-pendaftaran', { pendaftaran_id }, 'Pendaftaran dibatalkan ✓');
     load();
   }
 
@@ -190,6 +164,47 @@ export default function DetailSesi() {
     setMsg('');
     await apiCall('/api/admin/batal-main', { sesi_id: id, lapangan: kodeLapangan }, 'Game dibatalkan ✓');
     load();
+  }
+
+  // Jalankan satu aksi untuk BANYAK peserta sekaligus (dipilih lewat kotak centang).
+  // Mengembalikan true kalau aksinya dijalankan, false kalau dibatalkan lewat konfirmasi.
+  async function jalankanAksi(aksi, ids) {
+    const sasaran = semuaTerdaftar.filter((p) => ids.includes(p.id) && bisaDiaksi(aksi, p));
+    const dilewati = ids.length - sasaran.length;
+    if (sasaran.length === 0) {
+      tampilToast('Tidak ada yang bisa diproses untuk aksi ini', 'error');
+      return false;
+    }
+
+    // Konfirmasi "yakin?" dipertahankan untuk Cancel (dan Ralat)
+    if (aksi === 'cancel' && !confirm(`Batalkan ${sasaran.length} pendaftaran? Slot akan otomatis dicoba diberikan ke waiting list.`)) return false;
+    if (aksi === 'ralat' && !confirm(`Ralat status ${sasaran.length} orang? Outstanding yang belum dibayar (kalau ada) akan ikut dihapus.`)) return false;
+
+    setMemproses(true);
+    setMsg('');
+
+    const satu = async (pid) => {
+      if (aksi === 'hadir') {
+        const a = await apiCall('/api/admin/checkin', { pendaftaran_id: pid });
+        if (!a.ok) return false;
+        const b = await apiCall('/api/admin/tandai-hadir', { pendaftaran_id: pid, status_hadir: 'hadir' });
+        return b.ok;
+      }
+      if (aksi === 'tidak_hadir') return (await apiCall('/api/admin/tandai-hadir', { pendaftaran_id: pid, status_hadir: 'no_show' })).ok;
+      if (aksi === 'ralat') return (await apiCall('/api/admin/ralat-hadir', { pendaftaran_id: pid })).ok;
+      return (await apiCall('/api/admin/batalkan-pendaftaran', { pendaftaran_id: pid })).ok;
+    };
+
+    // Cancel satu per satu (tiap cancel menaikkan waiting list, jangan balapan); lainnya 4 sekaligus
+    const hasil = await jalankanBerbatas(sasaran.map((p) => p.id), aksi === 'cancel' ? 1 : 4, satu);
+    const berhasil = hasil.filter(Boolean).length;
+    setMemproses(false);
+
+    const kata = { hadir: 'ditandai hadir', tidak_hadir: 'ditandai tidak hadir', ralat: 'diralat', cancel: 'dibatalkan' }[aksi];
+    if (berhasil > 0) tampilToast(`${berhasil} orang ${kata} ✓${dilewati > 0 ? ` (${dilewati} dilewati)` : ''}`);
+    if (berhasil < sasaran.length) tampilToast(`${sasaran.length - berhasil} gagal diproses`, 'error');
+    await load();
+    return true;
   }
 
   if (loading || !sesi) return <Memuat />;
@@ -257,14 +272,14 @@ export default function DetailSesi() {
         Terdaftar — Member ({terdaftarMember.length}/{totalMemberSesi})
       </HeaderCollapse>
       {bukaMember && (
-        <ListPeserta items={terdaftarMember} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} onRalat={ralatHadir} />
+        <DaftarPeserta items={terdaftarMember} profiles={profiles} bisaKontrol={bisaAdminKontrol} sibuk={memproses} onAksi={jalankanAksi} />
       )}
 
       <HeaderCollapse terbuka={bukaHarian} onToggle={() => setBukaHarian(!bukaHarian)}>
         Terdaftar — Harian ({terdaftarHarian.length})
       </HeaderCollapse>
       {bukaHarian && (
-        <ListPeserta items={terdaftarHarian} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} onRalat={ralatHadir} />
+        <DaftarPeserta items={terdaftarHarian} profiles={profiles} bisaKontrol={bisaAdminKontrol} sibuk={memproses} onAksi={jalankanAksi} />
       )}
 
       <HeaderCollapse terbuka={bukaGuest} onToggle={() => setBukaGuest(!bukaGuest)}>
@@ -273,7 +288,7 @@ export default function DetailSesi() {
       {bukaGuest && (
         <>
           <p className="subtle" style={{ fontSize: 11 }}>Pemain dadakan yang ditambahkan langsung oleh admin, tanpa perlu akun. Ikut kena tagihan sama seperti harian saat ditandai Hadir.</p>
-          <ListPeserta items={terdaftarGuest} profiles={profiles} isAdmin={bisaAdminKontrol} onHadir={hadirGabungan} onTandai={tandaiHadir} onBatalkan={batalkanAdmin} onRalat={ralatHadir} />
+          <DaftarPeserta items={terdaftarGuest} profiles={profiles} bisaKontrol={bisaAdminKontrol} sibuk={memproses} onAksi={jalankanAksi} />
         </>
       )}
       {isAdmin && (
@@ -392,63 +407,136 @@ export default function DetailSesi() {
               ))}
             </>
           )}
-
-          {belumCheckin.length > 0 && (
-            <>
-              <h2>Belum Check-in</h2>
-              {belumCheckin.map((p) => (
-                <div className="card" key={p.id}>
-                  <div className="card-row">
-                    <span>{namaPeserta(p, profiles)}</span>
-                    {p.status_hadir === 'no_show' ? (
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <span className="badge warn">Tidak Hadir</span>
-                        {bisaAdminKontrol && <button className="secondary" onClick={() => ralatHadir(p.id)}>Ralat</button>}
-                      </div>
-                    ) : (
-                      <button className="secondary" disabled={!bisaAdminKontrol} onClick={() => hadirGabungan(p.id)}>Hadir</button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </>
-          )}
         </>
       )}
     </div>
   );
 }
 
-function ListPeserta({ items, profiles, isAdmin, onHadir, onTandai, onBatalkan, onRalat }) {
+// Kotak centang sendiri (bukan input bawaan, karena gaya input global akan merusak bentuknya)
+function KotakCentang({ aktif }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: 18, height: 18, flex: 'none', borderRadius: 5,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        border: `1.5px solid ${aktif ? '#e8b64c' : '#ffffff66'}`,
+        background: aktif ? '#e8b64c' : 'transparent',
+        color: '#0d1a15', fontSize: 12, fontWeight: 700, lineHeight: 1,
+        transition: 'background 0.15s, border-color 0.15s',
+      }}
+    >
+      {aktif ? '✓' : ''}
+    </span>
+  );
+}
+
+function metaPeserta(p, kunci) {
+  if (kunci === 'tidak') return 'Tidak hadir';
+  if (kunci === 'sudah') {
+    const jam = new Date(p.waktu_checkin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
+    const lapangan = p.status_main === 'main' && p.lapangan_sekarang ? ` · di ${p.lapangan_sekarang}` : '';
+    return `${jam} · ${p.jumlah_game}x main${lapangan}`;
+  }
+  return p.jumlah_game > 0 ? `${p.jumlah_game}x main` : '';
+}
+
+// Daftar peserta ala Gmail: tombol aksi di atas, kotak centang per nama, bisa pilih banyak sekaligus.
+function DaftarPeserta({ items, profiles, bisaKontrol, sibuk, onAksi }) {
+  const [pilihan, setPilihan] = useState(() => new Set());
   if (items.length === 0) return <div className="empty">Belum ada.</div>;
-  return items.map((p) => {
-    return (
-      <div className="card" key={p.id}>
-        <div className="card-row">
-          <div>
-            <strong>{namaPeserta(p, profiles)}</strong>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-              {p.waktu_checkin ? `Check-in ${new Date(p.waktu_checkin).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB` : 'Belum check-in'}
-              {' · '}{p.jumlah_game}x main
-              {p.status_main === 'main' && p.lapangan_sekarang && ` · Sedang di ${p.lapangan_sekarang}`}
-              {p.status_hadir && ` · ${p.status_hadir === 'hadir' ? 'Hadir' : 'Tidak Hadir'}`}
-            </div>
+
+  const terpilihList = items.filter((p) => pilihan.has(p.id));
+  const jumlahTerpilih = terpilihList.length;
+  const semuaTerpilih = jumlahTerpilih === items.length;
+  const adaHadir = terpilihList.some((p) => bisaDiaksi('hadir', p));
+  const adaRalat = terpilihList.some((p) => bisaDiaksi('ralat', p));
+
+  function toggle(id) {
+    setPilihan((lama) => {
+      const baru = new Set(lama);
+      if (baru.has(id)) baru.delete(id); else baru.add(id);
+      return baru;
+    });
+  }
+  function toggleSemua() {
+    setPilihan(semuaTerpilih ? new Set() : new Set(items.map((p) => p.id)));
+  }
+  async function jalankan(aksi) {
+    const dijalankan = await onAksi(aksi, terpilihList.map((p) => p.id));
+    if (dijalankan) setPilihan(new Set());
+  }
+
+  const { belum, sudah, tidakHadir } = kelompokkanPeserta(items);
+  const grup = [
+    { kunci: 'belum', judul: 'Belum check-in', data: belum, garis: '#ffffff33', redup: false },
+    { kunci: 'sudah', judul: 'Sudah check-in', data: sudah, garis: '#9ed6b0', redup: false },
+    { kunci: 'tidak', judul: 'Tidak hadir', data: tidakHadir, garis: '#b5493a', redup: true },
+  ].filter((g) => g.data.length > 0);
+
+  const tombol = { padding: '6px 12px' };
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      {bisaKontrol && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: '6px 2px 10px', marginBottom: 6, borderBottom: '1px solid #ffffff1a' }}>
+          <div
+            role="checkbox"
+            aria-checked={semuaTerpilih}
+            onClick={toggleSemua}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}
+          >
+            <KotakCentang aktif={semuaTerpilih} />
+            <span className="subtle" style={{ fontSize: 11 }}>
+              {sibuk ? 'Memproses…' : jumlahTerpilih > 0 ? `${jumlahTerpilih} dipilih` : 'Pilih semua'}
+            </span>
           </div>
-          {isAdmin && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              {!p.status_hadir ? (
-                <>
-                  <button className="secondary" onClick={() => onHadir(p.id)}>Hadir</button>
-                  <button className="danger" onClick={() => onTandai(p.id, 'no_show')}>Tidak Hadir</button>
-                </>
-              ) : (
-                <button className="secondary" onClick={() => onRalat(p.id)}>Ralat</button>
-              )}
-              <button className="danger" onClick={() => onBatalkan(p.id)}>Cancel</button>
-            </div>
-          )}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginLeft: 'auto' }}>
+            <button className="secondary" style={tombol} disabled={sibuk || !adaHadir} onClick={() => jalankan('hadir')}>Hadir</button>
+            <button className="danger" style={tombol} disabled={sibuk || !adaHadir} onClick={() => jalankan('tidak_hadir')}>Tidak Hadir</button>
+            <button className="secondary" style={tombol} disabled={sibuk || !adaRalat} onClick={() => jalankan('ralat')}>Ralat</button>
+            <button className="danger" style={tombol} disabled={sibuk || jumlahTerpilih === 0} onClick={() => jalankan('cancel')}>Cancel</button>
+          </div>
         </div>
-      </div>
-    );
-  });
+      )}
+
+      {grup.map((g) => (
+        <div key={g.kunci}>
+          <p className="subtle" style={{ fontSize: 11, fontWeight: 600, margin: '12px 0 6px' }}>{g.judul} ({g.data.length})</p>
+          {g.data.map((p) => {
+            const terpilih = pilihan.has(p.id);
+            const meta = metaPeserta(p, g.kunci);
+            return (
+              <div
+                key={p.id}
+                role={bisaKontrol ? 'checkbox' : undefined}
+                aria-checked={bisaKontrol ? terpilih : undefined}
+                onClick={bisaKontrol ? () => toggle(p.id) : undefined}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                  padding: '8px 12px', marginBottom: 6, borderRadius: 10,
+                  border: `1px solid ${terpilih ? '#e8b64c' : '#ffffff1a'}`,
+                  borderLeft: `3px solid ${terpilih ? '#e8b64c' : g.garis}`,
+                  background: terpilih ? '#e8b64c26' : '#16302691',
+                  cursor: bisaKontrol ? 'pointer' : 'default',
+                  opacity: g.redup && !terpilih ? 0.7 : 1,
+                  userSelect: 'none',
+                  transition: 'background 0.15s, border-color 0.15s',
+                }}
+              >
+                {bisaKontrol && <KotakCentang aktif={terpilih} />}
+                <span style={{ flex: '1 1 auto', fontSize: 13, fontWeight: terpilih ? 700 : 500, color: terpilih ? '#e8b64c' : undefined }}>
+                  {namaPeserta(p, profiles)}
+                </span>
+                {meta && (
+                  <span style={{ marginLeft: 'auto', fontSize: 11, color: g.kunci === 'tidak' ? '#e8988c' : 'var(--muted)' }}>{meta}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
 }
