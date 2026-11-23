@@ -4,6 +4,8 @@ import { useAuth, getAccessToken } from '../lib/useAuth';
 import TopBar from '../components/TopBar';
 import Memuat from '../components/Memuat';
 import { tampilToast } from '../components/Toast';
+import { BilahAksi, BarisPilih } from '../components/DaftarPilih';
+import { jalankanBerbatas } from '../lib/aksiPeserta';
 
 function formatRibuan(v) {
   const angka = String(v || '').replace(/\D/g, '');
@@ -31,7 +33,7 @@ export default function Kas() {
   const [outstanding, setOutstanding] = useState([]);
   const [form, setForm] = useState({ jenis: 'pengeluaran', kategori: 'bola', nominal: '', keterangan: '' });
   const [msg, setMsg] = useState('');
-  const [processingId, setProcessingId] = useState(null);
+  const [memproses, setMemproses] = useState(false);
   const [stokLog, setStokLog] = useState([]);
   const [stokForm, setStokForm] = useState({ arah: 'tambah', slop: '', piece: '' });
   const [showSemuaStok, setShowSemuaStok] = useState(false);
@@ -117,12 +119,18 @@ export default function Kas() {
     load();
   }
 
-  async function lunasi(outstanding_id) {
-    if (processingId) return;
-    setProcessingId(outstanding_id);
+  // Tandai lunas satu atau BANYAK tagihan sekaligus (dipilih lewat kotak centang)
+  async function lunasiMassal(ids) {
+    const sasaran = outstanding.filter((o) => ids.includes(o.id));
+    if (sasaran.length === 0) return false;
+    const total = sasaran.reduce((sum, o) => sum + o.nominal, 0);
+    if (sasaran.length > 1 && !confirm(`Tandai lunas ${sasaran.length} tagihan (total Rp${total.toLocaleString('id-ID')})? Ini mencatat pemasukan ke kas.`)) return false;
+
+    setMemproses(true);
     setMsg('');
     const token = await getAccessToken();
-    try {
+    const pesanGagal = [];
+    const hasil = await jalankanBerbatas(sasaran.map((o) => o.id), 4, async (outstanding_id) => {
       const res = await fetch('/api/admin/lunasi-outstanding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -130,14 +138,21 @@ export default function Kas() {
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        setMsg(`Gagal tandai lunas: ${json.error || 'terjadi kesalahan, coba lagi.'}`);
-        return;
+        pesanGagal.push(json.error || `kode ${res.status}`);
+        return false;
       }
-      tampilToast('Ditandai lunas ✓');
-    await load();
-    } finally {
-      setProcessingId(null);
+      return true;
+    });
+    const berhasil = hasil.filter(Boolean).length;
+    setMemproses(false);
+
+    if (berhasil > 0) tampilToast(`${berhasil} tagihan ditandai lunas ✓`);
+    if (berhasil < sasaran.length) {
+      setMsg(`Gagal tandai lunas ${sasaran.length - berhasil} tagihan: ${[...new Set(pesanGagal)].join('; ')}`);
+      tampilToast(`${sasaran.length - berhasil} gagal ditandai lunas`, 'error');
     }
+    await load();
+    return true;
   }
 
   async function updateStok(e) {
@@ -199,21 +214,9 @@ export default function Kas() {
         <span style={{ fontSize: 12, lineHeight: 1 }}>{bukaOutstanding ? '▲' : '▼'}</span>
         {outstanding.length === 0 && <span className="subtle" style={{ fontSize: 11 }}>Tidak ada outstanding. 🎉</span>}
       </div>
-      {bukaOutstanding && outstanding.map((o) => (
-        <div className="card outstanding-item" key={o.id}>
-          <div className="card-row">
-            <div>
-              <strong>{o.nama || '—'}</strong>
-              <div style={{ fontSize: 11, color: 'var(--muted)' }}>{o.keterangan} · Rp{o.nominal.toLocaleString('id-ID')}</div>
-            </div>
-            {isAdmin && (
-              <button className="secondary" disabled={processingId === o.id} onClick={() => lunasi(o.id)}>
-                {processingId === o.id ? 'Memproses...' : 'Tandai Lunas'}
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
+      {bukaOutstanding && outstanding.length > 0 && (
+        <DaftarOutstanding items={outstanding} bisaKontrol={!!isAdmin} sibuk={memproses} onLunasi={lunasiMassal} />
+      )}
 
       <h2>Update Stok Shuttlecock</h2>
       <div className="card">
@@ -342,6 +345,53 @@ export default function Kas() {
       <p className="subtle" style={{ fontSize: 11, marginTop: 8 }}>
         Menampilkan {transaksi.length} dari {totalTransaksi} transaksi. Saldo dihitung dari semua transaksi.
       </p>
+    </div>
+  );
+}
+
+// Daftar tagihan belum lunas: kotak centang per tagihan, tombol "Tandai Lunas" di atas (untuk admin)
+function DaftarOutstanding({ items, bisaKontrol, sibuk, onLunasi }) {
+  const [pilihan, setPilihan] = useState(() => new Set());
+  const terpilihList = items.filter((o) => pilihan.has(o.id));
+  const jumlah = terpilihList.length;
+  const totalTerpilih = terpilihList.reduce((sum, o) => sum + o.nominal, 0);
+  const semua = items.length > 0 && jumlah === items.length;
+
+  function toggle(id) {
+    setPilihan((lama) => {
+      const baru = new Set(lama);
+      if (baru.has(id)) baru.delete(id); else baru.add(id);
+      return baru;
+    });
+  }
+  async function jalankan() {
+    const dijalankan = await onLunasi(terpilihList.map((o) => o.id));
+    if (dijalankan) setPilihan(new Set());
+  }
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      {bisaKontrol && (
+        <BilahAksi
+          semuaTerpilih={semua}
+          onToggleSemua={() => setPilihan(semua ? new Set() : new Set(items.map((o) => o.id)))}
+          ringkasan={sibuk ? 'Memproses…' : jumlah > 0 ? `${jumlah} dipilih · Rp${totalTerpilih.toLocaleString('id-ID')}` : 'Pilih semua'}
+        >
+          <button style={{ padding: '6px 12px' }} disabled={sibuk || jumlah === 0} onClick={jalankan}>Tandai Lunas</button>
+        </BilahAksi>
+      )}
+      {items.map((o) => (
+        <BarisPilih
+          key={o.id}
+          label={o.nama || '—'}
+          subteks={o.keterangan}
+          kanan={`Rp${o.nominal.toLocaleString('id-ID')}`}
+          terpilih={pilihan.has(o.id)}
+          bisaPilih={bisaKontrol}
+          onToggle={() => toggle(o.id)}
+          garis="#b5493a"
+        />
+      ))}
     </div>
   );
 }
