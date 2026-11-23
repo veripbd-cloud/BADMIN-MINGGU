@@ -35,7 +35,7 @@ anggota di file ini.
 - `pages/api/` endpoint server. Folder `api/admin/` hanya untuk admin (semua mengecek peran).
   Endpoint pemain: `daftar-sesi`, `batal-sesi`, `daftar-member-bulanan`, `batal-member-bulanan`, `brand`, `manifest` (agar bisa dipasang di layar HP), `kas`, `kas-ringkasan`, `outstanding-saya`.
 - `lib/` `supabaseClient.js` (browser), `supabaseAdmin.js` (server), `useAuth.js` (sesi login)
-- `components/TopBar.js` navbar + nama brand; `components/Toast.js` pemberitahuan kecil
+- `components/TopBar.js` navbar + nama brand; `components/Toast.js` pemberitahuan kecil; `components/DaftarPilih.js` kotak centang & bilah aksi (Kas, peserta konfirmasi member)
 - `styles/globals.css` seluruh tampilan
 - `supabase/` skema & migrasi SQL (lihat bagian Database)
 - `public/` ikon tab dan gambar preview link
