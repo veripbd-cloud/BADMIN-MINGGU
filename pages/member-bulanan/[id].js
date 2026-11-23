@@ -5,6 +5,7 @@ import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
 import Memuat from '../../components/Memuat';
 import { tampilToast } from '../../components/Toast';
+import { BilahAksi, BarisPilih } from '../../components/DaftarPilih';
 
 const NAMA_BULAN = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
@@ -19,8 +20,8 @@ export default function DetailMemberBulanan() {
   const [hasilProses, setHasilProses] = useState(null);
   const [msg, setMsg] = useState('');
   const [calon, setCalon] = useState([]);
-  const [calonId, setCalonId] = useState('');
-  const [menambah, setMenambah] = useState(false);
+  const [memproses, setMemproses] = useState(false);
+  const [bukaTambah, setBukaTambah] = useState(false);
 
   const isAdmin = profile && (profile.role === 'admin' || profile.role === 'super_admin');
 
@@ -77,27 +78,63 @@ export default function DetailMemberBulanan() {
     }
   }
 
-  async function tambahPeserta() {
-    if (!calonId) return;
-    setMenambah(true);
+  // Tambah BANYAK peserta sekaligus: satu permintaan ke server (bukan satu-satu)
+  async function tambahPeserta(playerIds) {
+    if (playerIds.length === 0) return false;
+    setMemproses(true);
     setMsg('');
     const token = await getAccessToken();
     const res = await fetch('/api/admin/tambah-peserta-member', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ sesi_member_bulanan_id: id, player_id: calonId }),
+      body: JSON.stringify({ sesi_member_bulanan_id: id, player_ids: playerIds }),
     });
     const json = await res.json().catch(() => ({}));
-    setMenambah(false);
+    setMemproses(false);
     if (!res.ok) {
       const pesan = json.error || `Gagal menambah peserta (kode ${res.status})`;
       setMsg(pesan);
       tampilToast(pesan, 'error');
-      return;
+      return false;
     }
-    setCalonId('');
-    tampilToast('Peserta ditambahkan ✓');
-    load();
+    if (json.berhasil > 0) tampilToast(`${json.berhasil} peserta ditambahkan ✓`);
+    if (json.gagal > 0) {
+      const alasan = [...new Set((json.hasil || []).filter((h) => !h.ok).map((h) => h.error))].join('; ');
+      setMsg(`${json.gagal} gagal ditambahkan: ${alasan}`);
+      tampilToast(`${json.gagal} gagal ditambahkan`, 'error');
+    }
+    await load();
+    return true;
+  }
+
+  // KOREKSI kesalahan admin: keluarkan peserta dari sesi ini (tagihan belum dibayar ikut dihapus)
+  async function koreksiPeserta(playerIds) {
+    if (playerIds.length === 0) return false;
+    if (!confirm(`Koreksi ${playerIds.length} peserta? Mereka dikeluarkan dari sesi ini dan tagihan yang belum dibayar dihapus. (Yang sudah lunas tidak diubah.)`)) return false;
+    setMemproses(true);
+    setMsg('');
+    const token = await getAccessToken();
+    const res = await fetch('/api/admin/koreksi-peserta-member', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ sesi_member_bulanan_id: id, player_ids: playerIds }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setMemproses(false);
+    if (!res.ok) {
+      const pesan = json.error || `Gagal mengoreksi (kode ${res.status})`;
+      setMsg(pesan);
+      tampilToast(pesan, 'error');
+      return false;
+    }
+    if (json.berhasil > 0) tampilToast(`${json.berhasil} peserta dikoreksi ✓`);
+    if (json.gagal > 0) {
+      const alasan = [...new Set((json.hasil || []).filter((h) => !h.ok).map((h) => h.error))].join('; ');
+      setMsg(`${json.gagal} dilewati: ${alasan}`);
+      tampilToast(`${json.gagal} dilewati`, 'error');
+    }
+    await load();
+    return true;
   }
 
   useEffect(() => { load(); }, [id, isAdmin]);
@@ -125,44 +162,158 @@ export default function DetailMemberBulanan() {
 
       {isAdmin && (
         <div className="card">
-          <p style={{ margin: '0 0 6px', fontWeight: 600 }}>Tambah peserta</p>
-          <p className="subtle" style={{ fontSize: 11, marginTop: 0 }}>
-            Buat yang telat daftar (admin tetap boleh walau deadline sudah lewat). Tagihan iuran otomatis
-            muncul di Kas; tandai lunas di sana (harian otomatis naik jadi member).
-          </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <select value={calonId} onChange={(e) => setCalonId(e.target.value)} style={{ flex: 1 }}>
-              <option value="">Pilih pemain...</option>
-              {calon.map((u) => (
-                <option key={u.id} value={u.id}>{u.nama} ({u.tipe === 'member' ? 'member' : 'harian'})</option>
-              ))}
-            </select>
-            <button disabled={!calonId || menambah} onClick={tambahPeserta}>{menambah ? '...' : 'Tambah'}</button>
+          <div className="card-row" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={() => setBukaTambah(!bukaTambah)}>
+            <strong>Tambah peserta ({calon.length} calon)</strong>
+            <span style={{ fontSize: 12, lineHeight: 1 }}>{bukaTambah ? '▲' : '▼'}</span>
           </div>
+          {bukaTambah && (
+            <>
+              <p className="subtle" style={{ fontSize: 11, margin: '8px 0 10px' }}>
+                Pilih satu atau banyak pemain sekaligus (admin tetap boleh walau deadline sudah lewat). Tagihan iuran
+                otomatis muncul di Kas; tandai lunas di sana (harian otomatis naik jadi member).
+              </p>
+              <DaftarCalon calon={calon} sibuk={memproses} onTambah={tambahPeserta} />
+            </>
+          )}
         </div>
       )}
 
-      <h2>Daftar Peserta</h2>
-      {pendaftaran.length === 0 && <div className="empty">Belum ada yang daftar.</div>}
-      {pendaftaran.map((p) => {
-        const o = outstandingMap[p.id];
-        const label = !o ? 'Tanpa tagihan' : o.status === 'lunas' ? 'Lunas' : 'Belum Lunas';
-        const kelas = !o ? '' : o.status === 'lunas' ? 'open' : 'warn';
-        return (
-          <div className="card" key={p.id}>
-            <div className="card-row">
-              <span>
-                {profiles[p.player_id]?.nama || '—'}
-                {o && <span className="subtle" style={{ fontSize: 11 }}> · Rp{o.nominal.toLocaleString('id-ID')}</span>}
-              </span>
-              {isAdmin && <span className={`badge ${kelas}`}>{label}</span>}
-            </div>
-          </div>
-        );
-      })}
+      <h2>Daftar Peserta ({pendaftaran.length})</h2>
+      <DaftarPesertaBulanan
+        items={pendaftaran}
+        profiles={profiles}
+        outstandingMap={outstandingMap}
+        bisaKontrol={!!isAdmin}
+        sibuk={memproses}
+        onKoreksi={koreksiPeserta}
+      />
       <p className="subtle" style={{ marginTop: 16 }}>
         Buat tandain lunas, prosesnya di halaman <strong>Kas & Shuttlecock</strong> (bagian Outstanding).
       </p>
+    </div>
+  );
+}
+
+// Calon peserta: cari nama, pilih banyak, lalu Tambah
+function DaftarCalon({ calon, sibuk, onTambah }) {
+  const [cari, setCari] = useState('');
+  const [pilihan, setPilihan] = useState(() => new Set());
+
+  if (calon.length === 0) return <div className="empty">Semua pemain sudah terdaftar.</div>;
+
+  const tampil = calon.filter((u) => (u.nama || '').toLowerCase().includes(cari.trim().toLowerCase()));
+  const terpilih = calon.filter((u) => pilihan.has(u.id));
+  const semua = tampil.length > 0 && tampil.every((u) => pilihan.has(u.id));
+
+  function toggle(id) {
+    setPilihan((lama) => {
+      const baru = new Set(lama);
+      if (baru.has(id)) baru.delete(id); else baru.add(id);
+      return baru;
+    });
+  }
+  function toggleSemua() {
+    setPilihan((lama) => {
+      const baru = new Set(lama);
+      if (semua) tampil.forEach((u) => baru.delete(u.id)); else tampil.forEach((u) => baru.add(u.id));
+      return baru;
+    });
+  }
+  async function jalankan() {
+    const dijalankan = await onTambah(terpilih.map((u) => u.id));
+    if (dijalankan) setPilihan(new Set());
+  }
+
+  return (
+    <div>
+      <input placeholder="Cari nama…" value={cari} onChange={(e) => setCari(e.target.value)} style={{ marginBottom: 10 }} />
+      <BilahAksi
+        semuaTerpilih={semua}
+        onToggleSemua={toggleSemua}
+        ringkasan={sibuk ? 'Memproses…' : terpilih.length > 0 ? `${terpilih.length} dipilih` : 'Pilih semua'}
+      >
+        <button style={{ padding: '6px 12px' }} disabled={sibuk || terpilih.length === 0} onClick={jalankan}>Tambah</button>
+      </BilahAksi>
+      {tampil.length === 0 && <div className="empty">Tidak ada yang cocok.</div>}
+      {tampil.map((u) => (
+        <BarisPilih
+          key={u.id}
+          label={u.nama}
+          kanan={u.tipe === 'member' ? 'Member' : 'Harian'}
+          terpilih={pilihan.has(u.id)}
+          bisaPilih
+          onToggle={() => toggle(u.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Peserta sesi ini. Admin: kotak centang + tombol Koreksi (untuk kesalahan isi), dikelompokkan menurut status bayar.
+function DaftarPesertaBulanan({ items, profiles, outstandingMap, bisaKontrol, sibuk, onKoreksi }) {
+  const [pilihan, setPilihan] = useState(() => new Set());
+  if (items.length === 0) return <div className="empty">Belum ada yang daftar.</div>;
+
+  const terpilihList = items.filter((p) => pilihan.has(p.id));
+  const semua = terpilihList.length === items.length;
+  const statusBayar = (p) => {
+    const o = outstandingMap[p.id];
+    if (!o) return 'tanpa';
+    return o.status === 'lunas' ? 'lunas' : 'belum';
+  };
+  const definisi = [
+    { kunci: 'belum', judul: 'Belum lunas', warna: '#e8988c', garis: '#b5493a' },
+    { kunci: 'lunas', judul: 'Lunas', warna: '#9ed6b0', garis: '#9ed6b0' },
+    { kunci: 'tanpa', judul: 'Tanpa tagihan', warna: undefined, garis: '#ffffff33' },
+  ];
+  const grup = bisaKontrol
+    ? definisi.map((g) => ({ ...g, data: items.filter((p) => statusBayar(p) === g.kunci) })).filter((g) => g.data.length > 0)
+    : [{ kunci: 'semua', judul: null, warna: undefined, garis: '#ffffff33', data: items }];
+
+  function toggle(id) {
+    setPilihan((lama) => {
+      const baru = new Set(lama);
+      if (baru.has(id)) baru.delete(id); else baru.add(id);
+      return baru;
+    });
+  }
+  async function jalankan() {
+    const dijalankan = await onKoreksi(terpilihList.map((p) => p.player_id));
+    if (dijalankan) setPilihan(new Set());
+  }
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      {bisaKontrol && (
+        <BilahAksi
+          semuaTerpilih={semua}
+          onToggleSemua={() => setPilihan(semua ? new Set() : new Set(items.map((p) => p.id)))}
+          ringkasan={sibuk ? 'Memproses…' : terpilihList.length > 0 ? `${terpilihList.length} dipilih` : 'Pilih semua'}
+        >
+          <button className="danger" style={{ padding: '6px 12px' }} disabled={sibuk || terpilihList.length === 0} onClick={jalankan}>Koreksi</button>
+        </BilahAksi>
+      )}
+      {grup.map((g) => (
+        <div key={g.kunci}>
+          {g.judul && <p className="subtle" style={{ fontSize: 11, fontWeight: 600, margin: '12px 0 6px' }}>{g.judul} ({g.data.length})</p>}
+          {g.data.map((p) => {
+            const o = outstandingMap[p.id];
+            return (
+              <BarisPilih
+                key={p.id}
+                label={profiles[p.player_id]?.nama || '—'}
+                subteks={bisaKontrol && o ? `Rp${o.nominal.toLocaleString('id-ID')}` : undefined}
+                kanan={bisaKontrol ? g.judul : undefined}
+                warnaKanan={g.warna}
+                terpilih={pilihan.has(p.id)}
+                bisaPilih={bisaKontrol}
+                onToggle={() => toggle(p.id)}
+                garis={g.garis}
+              />
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }
