@@ -6,6 +6,7 @@ import TopBar from '../../components/TopBar';
 import Memuat from '../../components/Memuat';
 import { tampilToast } from '../../components/Toast';
 import { kelompokkanPeserta, bisaDiaksi, jalankanBerbatas } from '../../lib/aksiPeserta';
+import { KotakCentang, DuaKolom, BarisKompak } from '../../components/DaftarPilih';
 
 const DAFTAR_LAPANGAN = ['A6', 'A7', 'A9', 'A10'];
 
@@ -413,35 +414,6 @@ export default function DetailSesi() {
   );
 }
 
-// Kotak centang sendiri (bukan input bawaan, karena gaya input global akan merusak bentuknya)
-function KotakCentang({ aktif }) {
-  return (
-    <span
-      aria-hidden="true"
-      style={{
-        width: 18, height: 18, flex: 'none', borderRadius: 5,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        border: `1.5px solid ${aktif ? '#e8b64c' : '#ffffff66'}`,
-        background: aktif ? '#e8b64c' : 'transparent',
-        color: '#0d1a15', fontSize: 12, fontWeight: 700, lineHeight: 1,
-        transition: 'background 0.15s, border-color 0.15s',
-      }}
-    >
-      {aktif ? '✓' : ''}
-    </span>
-  );
-}
-
-function metaPeserta(p, kunci) {
-  if (kunci === 'tidak') return 'Tidak hadir';
-  if (kunci === 'sudah') {
-    const jam = new Date(p.waktu_checkin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
-    const lapangan = p.status_main === 'main' && p.lapangan_sekarang ? ` · di ${p.lapangan_sekarang}` : '';
-    return `${jam} · ${p.jumlah_game}x main${lapangan}`;
-  }
-  return p.jumlah_game > 0 ? `${p.jumlah_game}x main` : '';
-}
-
 // Daftar peserta ala Gmail: tombol aksi di atas, kotak centang per nama, bisa pilih banyak sekaligus.
 function DaftarPeserta({ items, profiles, bisaKontrol, sibuk, onAksi }) {
   const [pilihan, setPilihan] = useState(() => new Set());
@@ -468,7 +440,7 @@ function DaftarPeserta({ items, profiles, bisaKontrol, sibuk, onAksi }) {
     if (dijalankan) setPilihan(new Set());
   }
 
-  const { belum, sudah, tidakHadir } = kelompokkanPeserta(items);
+  const { belum, sudah, tidakHadir } = kelompokkanPeserta(items, (p) => namaPeserta(p, profiles));
   const grup = [
     { kunci: 'belum', judul: 'Belum check-in', data: belum, garis: '#ffffff33', redup: false },
     { kunci: 'sudah', judul: 'Sudah check-in', data: sudah, garis: '#9ed6b0', redup: false },
@@ -501,42 +473,19 @@ function DaftarPeserta({ items, profiles, bisaKontrol, sibuk, onAksi }) {
         </div>
       )}
 
-      {grup.map((g) => (
-        <div key={g.kunci}>
-          <p className="subtle" style={{ fontSize: 11, fontWeight: 600, margin: '12px 0 6px' }}>{g.judul} ({g.data.length})</p>
-          {g.data.map((p) => {
-            const terpilih = pilihan.has(p.id);
-            const meta = metaPeserta(p, g.kunci);
-            return (
-              <div
-                key={p.id}
-                role={bisaKontrol ? 'checkbox' : undefined}
-                aria-checked={bisaKontrol ? terpilih : undefined}
-                onClick={bisaKontrol ? () => toggle(p.id) : undefined}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
-                  padding: '8px 12px', marginBottom: 6, borderRadius: 10,
-                  border: `1px solid ${terpilih ? '#e8b64c' : '#ffffff1a'}`,
-                  borderLeft: `3px solid ${terpilih ? '#e8b64c' : g.garis}`,
-                  background: terpilih ? '#e8b64c26' : '#16302691',
-                  cursor: bisaKontrol ? 'pointer' : 'default',
-                  opacity: g.redup && !terpilih ? 0.7 : 1,
-                  userSelect: 'none',
-                  transition: 'background 0.15s, border-color 0.15s',
-                }}
-              >
-                {bisaKontrol && <KotakCentang aktif={terpilih} />}
-                <span style={{ flex: '1 1 auto', fontSize: 13, fontWeight: terpilih ? 700 : 500, color: terpilih ? '#e8b64c' : undefined }}>
-                  {namaPeserta(p, profiles)}
-                </span>
-                {meta && (
-                  <span style={{ marginLeft: 'auto', fontSize: 11, color: g.kunci === 'tidak' ? '#e8988c' : 'var(--muted)' }}>{meta}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      ))}
+      <DuaKolom
+        grup={grup}
+        renderBaris={(p, g) => (
+          <BarisKompak
+            label={namaPeserta(p, profiles)}
+            terpilih={pilihan.has(p.id)}
+            bisaPilih={bisaKontrol}
+            onToggle={() => toggle(p.id)}
+            garis={g.garis}
+            redup={g.redup}
+          />
+        )}
+      />
     </div>
   );
 }
