@@ -1,3 +1,5 @@
+import { susunDuaKolom } from '../lib/aksiPeserta';
+
 // Potongan tampilan bersama untuk daftar dengan kotak centang ala Gmail
 
 // Kotak centang digambar sendiri (bukan <input>) karena gaya input global akan merusak bentuknya
@@ -62,6 +64,58 @@ export function BarisPilih({ label, subteks, kanan, warnaKanan, terpilih, bisaPi
         {subteks && <div className="subtle" style={{ fontSize: 11 }}>{subteks}</div>}
       </div>
       {kanan && <span style={{ marginLeft: 'auto', fontSize: 11, textAlign: 'right', color: warnaKanan || 'var(--muted)' }}>{kanan}</span>}
+    </div>
+  );
+}
+
+// Baris ringkas: kotak centang + nama saja (untuk tata letak dua kolom)
+export function BarisKompak({ label, terpilih, bisaPilih, onToggle, garis = '#ffffff33', redup = false }) {
+  return (
+    <div
+      role={bisaPilih ? 'checkbox' : undefined}
+      aria-checked={bisaPilih ? terpilih : undefined}
+      onClick={bisaPilih ? onToggle : undefined}
+      title={label}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '6px 8px', marginBottom: 5, borderRadius: 8,
+        border: `1px solid ${terpilih ? '#e8b64c' : '#ffffff1a'}`,
+        borderLeft: `3px solid ${terpilih ? '#e8b64c' : garis}`,
+        background: terpilih ? '#e8b64c26' : '#16302691',
+        cursor: bisaPilih ? 'pointer' : 'default',
+        opacity: redup && !terpilih ? 0.7 : 1,
+        userSelect: 'none',
+        transition: 'background 0.15s, border-color 0.15s',
+      }}
+    >
+      {bisaPilih && <KotakCentang aktif={terpilih} />}
+      <span style={{
+        flex: 1, minWidth: 0, fontSize: 12, fontWeight: terpilih ? 700 : 500,
+        color: terpilih ? '#e8b64c' : undefined,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>{label}</span>
+    </div>
+  );
+}
+
+// Daftar bergrup dalam dua kolom: kiri diisi dulu (15 per kolom), sisanya ke kanan
+export function DuaKolom({ grup, renderBaris, perKolom = 15 }) {
+  const kolom = susunDuaKolom(grup, perKolom);
+  return (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+      {kolom.map((isi, idx) => (
+        <div key={idx} style={{ flex: '1 1 0', minWidth: 0 }}>
+          {isi.map((e, i) =>
+            e.tipe === 'judul' ? (
+              <p key={`j${i}`} className="subtle" style={{ fontSize: 11, fontWeight: 600, margin: i === 0 ? '0 0 6px' : '12px 0 6px' }}>
+                {e.g.judul} ({e.g.data.length}){e.lanjutan ? ' · lanjutan' : ''}
+              </p>
+            ) : (
+              <div key={e.item.id}>{renderBaris(e.item, e.g)}</div>
+            )
+          )}
+        </div>
+      ))}
     </div>
   );
 }
