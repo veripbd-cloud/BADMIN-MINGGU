@@ -5,7 +5,8 @@ import { useAuth, getAccessToken } from '../../lib/useAuth';
 import TopBar from '../../components/TopBar';
 import Memuat from '../../components/Memuat';
 import { tampilToast } from '../../components/Toast';
-import { BilahAksi, BarisPilih } from '../../components/DaftarPilih';
+import { BilahAksi, DuaKolom, BarisKompak } from '../../components/DaftarPilih';
+import { urutkanAZ } from '../../lib/aksiPeserta';
 
 const NAMA_BULAN = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
@@ -201,7 +202,7 @@ function DaftarCalon({ calon, sibuk, onTambah }) {
 
   if (calon.length === 0) return <div className="empty">Semua pemain sudah terdaftar.</div>;
 
-  const tampil = calon.filter((u) => (u.nama || '').toLowerCase().includes(cari.trim().toLowerCase()));
+  const tampil = urutkanAZ(calon.filter((u) => (u.nama || '').toLowerCase().includes(cari.trim().toLowerCase())), (u) => u.nama || '');
   const terpilih = calon.filter((u) => pilihan.has(u.id));
   const semua = tampil.length > 0 && tampil.every((u) => pilihan.has(u.id));
 
@@ -235,16 +236,15 @@ function DaftarCalon({ calon, sibuk, onTambah }) {
         <button style={{ padding: '6px 12px' }} disabled={sibuk || terpilih.length === 0} onClick={jalankan}>Tambah</button>
       </BilahAksi>
       {tampil.length === 0 && <div className="empty">Tidak ada yang cocok.</div>}
-      {tampil.map((u) => (
-        <BarisPilih
-          key={u.id}
-          label={u.nama}
-          kanan={u.tipe === 'member' ? 'Member' : 'Harian'}
-          terpilih={pilihan.has(u.id)}
-          bisaPilih
-          onToggle={() => toggle(u.id)}
-        />
-      ))}
+      <DuaKolom
+        grup={[
+          { kunci: 'member', judul: 'Member', garis: '#9ed6b0', data: tampil.filter((u) => u.tipe === 'member') },
+          { kunci: 'harian', judul: 'Harian', garis: '#ffffff33', data: tampil.filter((u) => u.tipe !== 'member') },
+        ].filter((g) => g.data.length > 0)}
+        renderBaris={(u, g) => (
+          <BarisKompak label={u.nama} terpilih={pilihan.has(u.id)} bisaPilih onToggle={() => toggle(u.id)} garis={g.garis} />
+        )}
+      />
     </div>
   );
 }
@@ -266,9 +266,10 @@ function DaftarPesertaBulanan({ items, profiles, outstandingMap, bisaKontrol, si
     { kunci: 'lunas', judul: 'Lunas', warna: '#9ed6b0', garis: '#9ed6b0' },
     { kunci: 'tanpa', judul: 'Tanpa tagihan', warna: undefined, garis: '#ffffff33' },
   ];
+  const namaDari = (p) => profiles[p.player_id]?.nama || '';
   const grup = bisaKontrol
-    ? definisi.map((g) => ({ ...g, data: items.filter((p) => statusBayar(p) === g.kunci) })).filter((g) => g.data.length > 0)
-    : [{ kunci: 'semua', judul: null, warna: undefined, garis: '#ffffff33', data: items }];
+    ? definisi.map((g) => ({ ...g, data: urutkanAZ(items.filter((p) => statusBayar(p) === g.kunci), namaDari) })).filter((g) => g.data.length > 0)
+    : [{ kunci: 'semua', judul: null, warna: undefined, garis: '#ffffff33', data: urutkanAZ(items, namaDari) }];
 
   function toggle(id) {
     setPilihan((lama) => {
@@ -293,27 +294,18 @@ function DaftarPesertaBulanan({ items, profiles, outstandingMap, bisaKontrol, si
           <button className="danger" style={{ padding: '6px 12px' }} disabled={sibuk || terpilihList.length === 0} onClick={jalankan}>Koreksi</button>
         </BilahAksi>
       )}
-      {grup.map((g) => (
-        <div key={g.kunci}>
-          {g.judul && <p className="subtle" style={{ fontSize: 11, fontWeight: 600, margin: '12px 0 6px' }}>{g.judul} ({g.data.length})</p>}
-          {g.data.map((p) => {
-            const o = outstandingMap[p.id];
-            return (
-              <BarisPilih
-                key={p.id}
-                label={profiles[p.player_id]?.nama || '—'}
-                subteks={bisaKontrol && o ? `Rp${o.nominal.toLocaleString('id-ID')}` : undefined}
-                kanan={bisaKontrol ? g.judul : undefined}
-                warnaKanan={g.warna}
-                terpilih={pilihan.has(p.id)}
-                bisaPilih={bisaKontrol}
-                onToggle={() => toggle(p.id)}
-                garis={g.garis}
-              />
-            );
-          })}
-        </div>
-      ))}
+      <DuaKolom
+        grup={grup}
+        renderBaris={(p, g) => (
+          <BarisKompak
+            label={namaDari(p) || '—'}
+            terpilih={pilihan.has(p.id)}
+            bisaPilih={bisaKontrol}
+            onToggle={() => toggle(p.id)}
+            garis={g.garis}
+          />
+        )}
+      />
     </div>
   );
 }
