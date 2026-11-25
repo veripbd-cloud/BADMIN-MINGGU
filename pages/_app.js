@@ -20,9 +20,11 @@ export default function App({ Component, pageProps }) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black" />
 
-        {/* Ikon tab browser, transparan (?v=3 biar browser ambil yang baru) */}
-        <link rel="icon" href="/favicon.ico?v=3" sizes="any" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=3" />
+        {/* Ikon tab browser, transparan (?v=4 biar browser ambil yang baru) */}
+        <link rel="icon" href="/favicon.ico?v=4" sizes="any" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=4" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=4" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=4" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
 
         {/* Preview link (WhatsApp, Telegram, dll) */}
