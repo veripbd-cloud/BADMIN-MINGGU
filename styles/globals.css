@@ -81,3 +81,17 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .wrap > .card:nth-of-type(10) { animation-delay: 0.36s; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* Logo shuttlecock samar di tengah latar tiap halaman.
+   Mau lebih terang / lebih redup? Ubah angka --watermark-opacity (0 = hilang, 0.15 = jelas). */
+:root { --watermark-opacity: 0.08; }
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: url('/icon-512.png') center center / min(78vw, 460px) no-repeat;
+  opacity: var(--watermark-opacity);
+}
+#__next { position: relative; z-index: 1; }
