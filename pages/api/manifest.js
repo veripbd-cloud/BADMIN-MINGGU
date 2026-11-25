@@ -24,8 +24,8 @@ export default async function handler(req, res) {
     background_color: '#10261d',
     theme_color: '#10261d',
     icons: [
-      { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-      { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+      { src: '/icon-app-192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/icon-app-512.png', sizes: '512x512', type: 'image/png' },
     ],
   }));
 }
